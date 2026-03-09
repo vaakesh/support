@@ -1,0 +1,35 @@
+services:
+  api:
+    container_name: support-api
+    build:
+      context: backend
+      dockerfile: Dockerfile
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - postgres
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/alembic:/backend/alembic
+      - ./backend/app:/backend/app
+      - ./backend/.python-version:/backend/.python-version
+      - ./backend/alembic.ini:/backend/alembic.ini
+      - ./backend/pyproject.toml:/backend/pyproject.toml
+      - ./backend/uv.lock:/backend/uv.lock
+      - ./backend/entrypoint.sh:/backend/entrypoint.sh
+    restart: on-failure:10
+  
+  postgres:
+    image: postgres:16
+    container_name: support-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: support
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
