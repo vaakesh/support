@@ -1,100 +1,153 @@
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.auth.utils import hash_password
+from app.users.errors import UserAlreadyExistsError, UserNotFoundError
 from app.users.models import User
-from app.users.schemas import UserCreate
-from app.auth.deps import hash_password
-from app.users.deps import get_user_by_uuid_or_error
-from app.users.errors import UserAlreadyExistsError
 
 
-async def svc_read_user(user_uuid: UUID, session: AsyncSession) -> User:
-    return await get_user_by_uuid_or_error(user_uuid, session)
-
-
-async def svc_create_user(
-    session: AsyncSession,
-    username: str,
-    email: str,
-    password: str,
-) -> User:
-    # stmt = select(User).where(
-    #     (User.username == username) | (User.email == email)
-    # )
-    # result = await session.execute(stmt)
-    # existing_user = result.scalar_one_or_none()
-
-    # if existing_user:
-    #     raise UserAlreadyExistsError()
-    
-    user = User(
-        username=username,
-        email=email,
-        hashed_password=hash_password(password),
-    )
-
-    session.add(user)
-    try:
-        await session.commit()
-    except IntegrityError:
-        await session.rollback()
-        raise UserAlreadyExistsError()
-    
-    await session.refresh(user)
-    
-    return user
-
-
-async def svc_update_user(
-        user_uuid: UUID,
+class UserService:
+    def __init__(
+        self,
         session: AsyncSession,
+        user_repo: UserRepository,
+    ) -> None:
+        self.session = session
+        self.user_repo = user_repo
+
+    async def get_by_uuid(self, user_uuid: UUID) -> User:
+        """
+        Returns user by uuid or raises exception
+        """
+        user = await self.user_repo.get_by_uuid(user_uuid)
+        if user is None:
+            raise UserNotFoundError()
+        return user
+
+    async def get_by_username(self, username: str) -> User:
+        """
+        Returns user by username or raises exception
+        """
+        user = await self.user_repo.get_by_username(username)
+        if user is None:
+            raise UserNotFoundError()
+        return user
+
+    async def get_by_id(self, user_id: int) -> User:
+        """
+        Returns user by id or raises exception
+        """
+        user = await self.user_repo.get_by_id(user_id)
+        if user is None:
+            raise UserNotFoundError()
+        return user
+
+    async def get_by_email(self, email: str) -> User:
+        """
+        Returns user by email or raises exception
+        """
+        user = await self.user_repo.get_by_email(email)
+        if user is None:
+            raise UserNotFoundError()
+        return user
+
+    async def create_user(
+        self,
+        username: str,
+        email: str,
+        password: str,
+    ) -> User:
+        user = User(
+            username=username,
+            email=email,
+            hashed_password=hash_password(password),
+        )
+        self.session.add(user)
+
+        try:
+            await self.session.commit()
+        except IntegrityError as e:
+            await self.session.rollback()
+            raise UserAlreadyExistsError() from e
+        except Exception:
+            await self.session.rollback()
+            raise
+
+        await self.session.refresh(user)
+
+        return user
+
+    async def update_user(
+        self,
+        user_uuid: UUID,
         username: str | None = None,
         email: str | None = None,
         password: str | None = None,
-) -> User:
-    user = await get_user_by_uuid_or_error(user_uuid, session)
-    
-    if username is not None and username != user.username:
-        stmt = select(User).where(User.username == username, User.uuid != user.uuid)
-        result = await session.execute(stmt)
-        existing_user = result.scalar_one_or_none()
+    ) -> User:
+        updated = False
+        user = await self.get_by_uuid(user_uuid)
 
-        if existing_user:
-            raise UserAlreadyExistsError()
-        
-        user.username = username
+        if username is not None and username != user.username:
+            user.username = username
+            updated = True
 
-    if email is not None and email != user.email:
-        stmt = select(User).where(User.email == email, User.uuid != user.uuid)
-        result = await session.execute(stmt)
-        existing_user = result.scalar_one_or_none()
+        if email is not None and email != user.email:
+            user.email = email
+            updated = True
 
-        if existing_user:
-            raise UserAlreadyExistsError()
-        
-        user.email = email
+        if password is not None:
+            user.hashed_password = hash_password(password)
+            updated = True
 
-    if password is not None:
-        user.hashed_password = hash_password(password)
+        if not updated:
+            return user
+        try:
+            await self.session.commit()
+        except IntegrityError as e:
+            await self.session.rollback()
+            raise UserAlreadyExistsError() from e
+        except Exception:
+            await self.session.rollback()
+            raise
 
-    try:
-        await session.commit()
-    except IntegrityError as e:
-        await session.rollback()
-        raise UserAlreadyExistsError()
+        await self.session.refresh(user)
 
-    await session.refresh(user)
+        return user
 
-    return user
+    async def delete_user(self, user_uuid: UUID) -> None:
+        user = await self.get_by_uuid(user_uuid)
 
-async def svc_delete_user(user_uuid: UUID, session: AsyncSession) -> None:
-    user = await get_user_by_uuid_or_error(user_uuid, session)
-    
-    await session.delete(user)
-    try:
-        await session.commit()
-    except Exception:
-        await session.rollback()
-        raise
+        await self.session.delete(user)
+        try:
+            await self.session.commit()
+        except Exception:
+            await self.session.rollback()
+            raise
+
+
+class UserRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def get_by_username(self, username: str) -> User | None:
+        stmt = select(User).where(User.username == username)
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def get_by_uuid(self, user_uuid: UUID) -> User | None:
+        stmt = select(User).where(User.uuid == user_uuid)
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def get_by_id(self, user_id: int) -> User | None:
+        stmt = select(User).where(User.id == user_id)
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def get_by_email(self, user_email: str) -> User | None:
+        stmt = select(User).where(User.email == user_email)
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()

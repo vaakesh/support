@@ -1,22 +1,12 @@
-from uuid import UUID
-
-from sqlalchemy import select
+from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.users.models import User
-from app.users.errors import UserNotFoundError
+from app.deps import get_session
+from app.users.service import UserRepository, UserService
 
 
-
-async def get_user_by_uuid_or_error(
-        user_uuid: UUID,
-        session: AsyncSession,
-) -> User:
-    stmt = select(User).where(User.uuid == user_uuid)
-    result = await session.execute(stmt)
-    user = result.scalar_one_or_none()
-
-    if user is None:
-        raise UserNotFoundError()
-    
-    return user
+def get_user_service(
+    session: AsyncSession = Depends(get_session),
+) -> UserService:
+    user_repo = UserRepository(session)
+    return UserService(session, user_repo)
