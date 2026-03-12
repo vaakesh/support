@@ -1,10 +1,11 @@
 from fastapi import Request, Response
 
+from app.auth.deps import get_auth_token_service
 from app.auth.errors import RefreshTokenNotFoundError
-from app.auth.service import auth_token_config
 
 
 def set_tokens_cookie(access_token: str, refresh_token: str, response: Response) -> None:
+    auth_token_config = get_auth_token_service().config
     response.set_cookie(
         key="access_token",
         value=access_token,
@@ -19,7 +20,7 @@ def set_tokens_cookie(access_token: str, refresh_token: str, response: Response)
         httponly=True,
         secure=True,
         samesite="none",
-        max_age=60 * auth_token_config.refresh_token_expire_days,
+        max_age=60 * 60 * 24 * auth_token_config.refresh_token_expire_days,
     )
 
 

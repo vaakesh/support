@@ -6,8 +6,6 @@ from typing import Any
 from uuid import UUID
 
 import jwt
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.errors import (
     InvalidTokenError,
@@ -17,9 +15,9 @@ from app.auth.models import UserSession
 from app.auth.schemas import AuthTokenConfig, ClientInfo, IssuedTokens, TokenPair
 from app.auth.utils import verify_password
 from app.config import settings
+from app.service import UnitOfWork
 from app.users.errors import UserNotFoundError
 from app.users.models import User
-from app.users.service import UserRepository
 from app.utils import utcnow
 
 
@@ -69,10 +67,6 @@ class AuthTokenService:
             self.config.refresh_pepper_bytes, token.encode(), hashlib.sha256
         ).hexdigest()
 
-    def verify_refresh_token(self, token: str, token_hash: str) -> bool:
-        expected = self.hash_refresh_token(token)
-        return hmac.compare_digest(expected, token_hash)
-
     def issue_tokens(self, user_uuid: UUID) -> IssuedTokens:
         access_token = self.create_access_token(user_uuid)
         refresh_token = self.generate_refresh_token()
@@ -98,16 +92,8 @@ auth_token_service = AuthTokenService(auth_token_config)
 
 
 class AuthService:
-    def __init__(
-        self,
-        session: AsyncSession,
-        auth_repo: AuthRepository,
-        user_repo: UserRepository,
-        auth_token_service: AuthTokenService,
-    ):
-        self.session = session
-        self.auth_repo = auth_repo
-        self.user_repo = user_repo
+    def __init__(self, uow: UnitOfWork, auth_token_service: AuthTokenService):
+        self.uow = uow
         self.auth_token_service = auth_token_service
 
     async def login(
@@ -116,47 +102,45 @@ class AuthService:
         password: str,
         client_info: ClientInfo,
     ) -> TokenPair:
-        user = await self.authenticate_user(
-            username,
-            password,
-        )
-        tokens = self.auth_token_service.issue_tokens(user.uuid)
-        user_session = self.build_user_session(user, tokens.refresh_token_hash, client_info)
-        self.session.add(user_session)
+        async with self.uow as uow:
+            user = await self._authenticate_user(
+                username,
+                password,
+                uow,
+            )
+            tokens = self.auth_token_service.issue_tokens(user.uuid)
+            user_session = self.build_user_session(
+                user, tokens.refresh_token_hash, client_info
+            )
+            uow.auth_repo.add(user_session)
 
-        try:
-            await self.session.commit()
-        except Exception:
-            await self.session.rollback()
-            raise
+            await uow.commit()
 
-        await self.session.refresh(user_session)
+            await uow.auth_repo.refresh(user_session)
 
-        return TokenPair(tokens.access_token, tokens.refresh_token)
+            return TokenPair(tokens.access_token, tokens.refresh_token)
 
     async def logout(
         self,
         user: User,
         refresh_token: str,
     ) -> None:
-        user_session = await self.validate_refresh_token(refresh_token)
-        if user_session.user_id != user.id:
-            raise InvalidTokenError()
+        async with self.uow as uow:
+            user_session = await self._validate_refresh_token(refresh_token, uow)
+            if user_session.user_id != user.id:
+                raise InvalidTokenError()
 
-        user_session.revoked_at = utcnow()
+            user_session.revoked_at = utcnow()
 
-        try:
-            await self.session.commit()
-        except Exception:
-            await self.session.rollback()
-            raise
+            await uow.commit()
 
-    async def authenticate_user(
+    async def _authenticate_user(
         self,
         username: str,
         password: str,
+        uow: UnitOfWork,
     ) -> User:
-        user = await self.user_repo.get_by_username(username)
+        user = await uow.user_repo.get_by_username(username)
         if not user or not verify_password(password, user.hashed_password):
             raise UserNotFoundError()
 
@@ -167,30 +151,32 @@ class AuthService:
         refresh_token: str,
         client_info: ClientInfo,
     ) -> TokenPair:
-        user_session = await self.validate_refresh_token(refresh_token)
-        user = await self.user_repo.get_by_id(user_session.user_id)
-        tokens = self.auth_token_service.issue_tokens(user.uuid)
-        new_user_session = self.build_user_session(
-            user, tokens.refresh_token_hash, client_info
-        )
+        async with self.uow as uow:
+            user_session = await self._validate_refresh_token(refresh_token, uow)
+            user = await uow.user_repo.get_by_id(user_session.user_id)
+            if user is None:
+                raise UserNotFoundError()
+            tokens = self.auth_token_service.issue_tokens(user.uuid)
+            new_user_session = self.build_user_session(
+                user, tokens.refresh_token_hash, client_info
+            )
+            uow.auth_repo.add(new_user_session)
+            await uow.auth_repo.flush()
+            user_session.replaced_by_session_id = new_user_session.id
+            user_session.revoked_at = utcnow()
 
-        self.session.add(new_user_session)
-        await self.session.flush()
-        user_session.replaced_by_session_id = new_user_session.id
-        try:
-            await self.session.commit()
-        except Exception:
-            await self.session.rollback()
-            raise
+            await uow.commit()
 
-        return TokenPair(tokens.access_token, tokens.refresh_token)
+            return TokenPair(tokens.access_token, tokens.refresh_token)
 
-    async def validate_refresh_token(self, refresh_token: str) -> UserSession:
+    async def _validate_refresh_token(
+        self, refresh_token: str, uow: UnitOfWork
+    ) -> UserSession:
         """
         returns a valid user session by refresh token or raises exception
         """
         refresh_token_hash = self.auth_token_service.hash_refresh_token(refresh_token)
-        user_session = await self.auth_repo.get_user_session(refresh_token_hash)
+        user_session = await uow.auth_repo.get_user_session_by_refresh(refresh_token_hash)
 
         if (
             user_session is None
@@ -215,34 +201,6 @@ class AuthService:
         )
         return user_session
 
-    async def get_all_users_sessions(self, user: User) -> list[UserSession]:
-        return await self.auth_repo.get_all_user_sessions(user.id)
-
-
-class AuthRepository:
-    def __init__(self, session: AsyncSession):
-        self.session = session
-
-    async def get_user_session(self, refresh_token_hash: str) -> UserSession:
-        stmt = (
-            select(UserSession)
-            .where(UserSession.refresh_token_hash == refresh_token_hash)
-            .with_for_update()
-        )
-        result = await self.session.execute(stmt)
-        user_session = result.scalar_one_or_none()
-        return user_session
-
     async def get_all_user_sessions(self, user_id: int) -> list[UserSession]:
-        sessions = (
-            (
-                await self.session.execute(
-                    select(UserSession).where(
-                        UserSession.user_id == user_id,
-                    )
-                )
-            )
-            .scalars()
-            .all()
-        )
-        return sessions
+        async with self.uow as uow:
+            return await uow.auth_repo.get_all_user_sessions(user_id)

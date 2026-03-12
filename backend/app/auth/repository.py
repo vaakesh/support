@@ -1,0 +1,51 @@
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.auth.models import UserSession
+from app.repository import AbstractRepository
+
+
+class AuthRepository(AbstractRepository[UserSession]):
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def get_by_id(self, user_session_id: int) -> UserSession | None:
+        return await self.session.get(UserSession, user_session_id)
+
+    def add(self, user_session: UserSession) -> None:
+        self.session.add(user_session)
+
+    async def delete(self, user_session: UserSession) -> None:
+        await self.session.delete(user_session)
+
+    async def refresh(self, user_session: UserSession) -> None:
+        await self.session.refresh(user_session)
+
+    async def flush(self) -> None:
+        await self.session.flush()
+
+    async def get_user_session_by_refresh(
+        self, refresh_token_hash: str, *, for_update: bool = False
+    ) -> UserSession | None:
+        stmt = select(UserSession).where(
+            UserSession.refresh_token_hash == refresh_token_hash
+        )
+        if for_update:
+            stmt = stmt.with_for_update()
+
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def get_all_user_sessions(self, user_id: int) -> list[UserSession]:
+        sessions = (
+            (
+                await self.session.execute(
+                    select(UserSession).where(
+                        UserSession.user_id == user_id,
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        return sessions

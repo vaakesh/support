@@ -52,5 +52,5 @@ async def get_sessions(
     user: User = Depends(get_current_user),
     auth_service: AuthService = Depends(get_auth_service),
 ) -> list[SessionOut]:
-    sessions = await auth_service.get_all_users_sessions(user)
-    return sessions
+    sessions = await auth_service.get_all_user_sessions(user.id)
+    return [SessionOut.model_validate(session) for session in sessions]

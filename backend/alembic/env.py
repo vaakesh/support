@@ -24,7 +24,8 @@ if config.config_file_name is not None:
 # target_metadata = mymodel.Base.metadata
 target_metadata = Base.metadata
 from app.config import settings
-from app import model_registry
+from app.auth.models import UserSession
+from app.users.models import User
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

@@ -1,23 +1,26 @@
 from uuid import UUID
 
 from fastapi import Depends, Request
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.errors import AccessTokenNotFoundError
 from app.auth.schemas import ClientInfo
-from app.auth.service import AuthRepository, AuthService, auth_token_service
-from app.deps import get_session
+from app.auth.service import AuthService, AuthTokenService, auth_token_service
+from app.deps import get_uow
+from app.service import UnitOfWork
 from app.users.deps import get_user_service
 from app.users.models import User
-from app.users.service import UserRepository, UserService
+from app.users.service import UserService
+
+
+def get_auth_token_service() -> AuthTokenService:
+    return auth_token_service
 
 
 def get_auth_service(
-    session: AsyncSession = Depends(get_session),
+    auth_token_service: AuthTokenService = Depends(get_auth_token_service),
+    uow: UnitOfWork = Depends(get_uow),
 ) -> AuthService:
-    auth_repo = AuthRepository(session)
-    user_repo = UserRepository(session)
-    return AuthService(session, auth_repo, user_repo, auth_token_service)
+    return AuthService(uow, auth_token_service)
 
 
 async def get_current_user(
