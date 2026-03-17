@@ -4,8 +4,9 @@ from sqlalchemy.exc import IntegrityError
 
 from app.auth.utils import hash_password
 from app.service import UnitOfWork
-from app.users.errors import UserAlreadyExistsError, UserNotFoundError
+from app.users.errors import PermissionDeniedError, UserAlreadyExistsError, UserNotFoundError
 from app.users.models import User
+from app.users.schemas import UserCreate, UserUpdate
 
 
 class UserService:
@@ -60,19 +61,17 @@ class UserService:
 
     async def create_user(
         self,
-        username: str,
-        email: str,
-        password: str,
+        payload: UserCreate,
     ) -> User:
         """
         creates and returns user or raises exception if user exists
         """
         try:
             async with self.uow as uow:
+                user_data = payload.model_dump(exclude={"password"})
                 user = User(
-                    username=username,
-                    email=email,
-                    hashed_password=hash_password(password),
+                    **user_data,
+                    hashed_password=hash_password(payload.password),
                 )
                 uow.user_repo.add(user)
                 await uow.commit()
@@ -83,39 +82,41 @@ class UserService:
 
     async def update_user(
         self,
-        user_uuid: UUID,
-        username: str | None = None,
-        email: str | None = None,
-        password: str | None = None,
+        current_user: User,
+        target_user_uuid: UUID,
+        payload: UserUpdate,
     ) -> User:
+        if current_user.uuid != target_user_uuid and not current_user.is_admin:
+            raise PermissionDeniedError()
         try:
             async with self.uow as uow:
+                user = await self._get_user_by_uuid(uow, target_user_uuid)
+                update_data = payload.model_dump(exclude_unset=True)
                 updated = False
-                user = await self._get_user_by_uuid(uow, user_uuid)
 
-                if username is not None and username != user.username:
-                    user.username = username
+                if "username" in update_data and update_data["username"] != user.username:
+                    user.username = update_data["username"]
                     updated = True
 
-                if email is not None and email != user.email:
-                    user.email = email
+                if "email" in update_data and update_data["email"] != user.email:
+                    user.email = update_data["email"]
                     updated = True
 
-                if password is not None:
-                    user.hashed_password = hash_password(password)
+                if "password" in update_data:
+                    user.hashed_password = hash_password(update_data["password"])
                     updated = True
 
-                if not updated:
-                    return user
-
-                await uow.commit()
-                await uow.user_repo.refresh(user)
+                if updated:
+                    await uow.commit()
 
                 return user
         except IntegrityError as e:
             raise UserAlreadyExistsError() from e
 
-    async def delete_user(self, user_uuid: UUID) -> None:
+    async def delete_user(self, current_user: User, user_uuid: UUID) -> None:
+        if current_user.uuid != user_uuid and not current_user.is_admin:
+            raise PermissionDeniedError()
+        
         async with self.uow as uow:
             user = await self._get_user_by_uuid(uow, user_uuid)
             await uow.user_repo.delete(user)

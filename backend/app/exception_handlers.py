@@ -3,7 +3,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.auth.errors import InvalidTokenError
-from app.users.errors import UserAlreadyExistsError, UserNotFoundError
+from app.users.errors import PermissionDeniedError, UserAlreadyExistsError, UserNotFoundError
 
 
 async def user_not_found_handler(
@@ -24,6 +24,17 @@ async def user_already_exists_handler(
 ):
     return JSONResponse(
         status_code=status.HTTP_409_CONFLICT,
+        content={
+            "message": str(exc),
+        },
+    )
+
+async def permission_denied_handler(
+    request: Request,
+    exc: PermissionDeniedError,
+):
+    return JSONResponse(
+        status_code=status.HTTP_403_FORBIDDEN,
         content={
             "message": str(exc),
         },
@@ -63,4 +74,5 @@ def register_exception_handlers(app: FastAPI):
     app.add_exception_handler(UserAlreadyExistsError, user_already_exists_handler)
     app.add_exception_handler(InvalidTokenError, invalid_token_handler)
     app.add_exception_handler(Exception, unhandled_exception_handler)
+    app.add_exception_handler(PermissionDeniedError, permission_denied_handler)
     app.add_exception_handler(RequestValidationError, request_validation_handler)

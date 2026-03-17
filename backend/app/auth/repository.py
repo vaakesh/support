@@ -1,4 +1,6 @@
-from sqlalchemy import select
+from datetime import datetime
+
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import UserSession
@@ -49,3 +51,22 @@ class AuthRepository(AbstractRepository[UserSession]):
             .all()
         )
         return sessions
+
+
+    async def revoke_active_session_by_refresh_token_hash(
+        self,
+        refresh_token_hash: str,
+        revoked_at: datetime,
+    ) -> bool:
+        stmt = (
+            update(UserSession)
+            .where(
+                UserSession.refresh_token_hash == refresh_token_hash,
+                UserSession.revoked_at.is_(None),
+                UserSession.replaced_by_session_id.is_(None),
+                UserSession.expires_at > revoked_at,
+            )
+            .values(revoked_at=revoked_at)
+        )
+        result = await self.session.execute(stmt)
+        return bool(result.rowcount)

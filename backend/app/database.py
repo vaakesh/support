@@ -1,11 +1,24 @@
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from functools import lru_cache
+
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
-from .config import settings
+from app.config import get_settings
 
-database_url = settings.database_url()
-engine = create_async_engine(database_url, echo=True)
-async_session_maker = async_sessionmaker(bind=engine, expire_on_commit=False)
+@lru_cache
+def get_engine() -> AsyncEngine:
+    settings = get_settings()
+    return create_async_engine(
+        settings.database_url(),
+        echo=True,
+    )
+
+@lru_cache
+def get_async_session_maker() -> async_sessionmaker[AsyncSession]:
+    return async_sessionmaker(
+        bind=get_engine(),
+        expire_on_commit=False,
+    )
 
 
 class Base(DeclarativeBase):

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Integer, String, func
+from sqlalchemy import BigInteger, Boolean, DateTime, Integer, String, func, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -11,7 +11,7 @@ from app.database import Base
 class User(Base):
     __tablename__ = "users"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     uuid: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         default=uuid.uuid4,
@@ -35,5 +35,7 @@ class User(Base):
         onupdate=func.now(),
         nullable=False,
     )
-
+    
+    is_admin: Mapped[bool] = mapped_column(Boolean, server_default=text("false"), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    

@@ -1,11 +1,10 @@
 #!/bin/sh
 set -e
 
-CERT_DIR="/backend/app/certs"
+CERT_DIR="/backend/certs"
 PRIVATE_KEY="$CERT_DIR/jwt-private.pem"
 PUBLIC_KEY="$CERT_DIR/jwt-public.pem"
 
-mkdir -p "$CERT_DIR"
 if [ ! -f "$PRIVATE_KEY" ]; then
     echo "Generating private/public key pair..."
     uv run openssl genpkey -algorithm RSA -out "$PRIVATE_KEY" -pkeyopt rsa_keygen_bits:2048

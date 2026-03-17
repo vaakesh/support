@@ -10,6 +10,10 @@ class ClientInfo:
     user_agent: str | None
     ip: str | None
 
+@dataclass(slots=True)
+class BearerToken:
+    access_token: str
+    token_type: str = "Bearer"
 
 @dataclass(slots=True, frozen=True)
 class TokenPair:

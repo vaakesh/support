@@ -7,7 +7,8 @@ services:
     env_file:
       - ./backend/.env
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     ports:
       - "8000:8000"
     volumes:
@@ -16,6 +17,7 @@ services:
       - ./backend/.python-version:/backend/.python-version
       - ./backend/alembic.ini:/backend/alembic.ini
       - ./backend/pyproject.toml:/backend/pyproject.toml
+      - ./backend/certs:/backend/certs
       - ./backend/uv.lock:/backend/uv.lock
       - ./backend/entrypoint.sh:/backend/entrypoint.sh
     restart: on-failure:10
@@ -28,8 +30,38 @@ services:
       POSTGRES_DB: support
       POSTGRES_USER: user
       POSTGRES_PASSWORD: secret
+    ports:
+      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d support"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  # pgadmin:
+  #   image: dpage/pgadmin4
+  #   environment:
+  #     PGADMIN_DEFAULT_EMAIL: admin@admin.com
+  #     PGADMIN_DEFAULT_PASSWORD: admin
+  #   ports:
+  #     - "5050:80"
+  #   depends_on:
+  #     - postgres
+
+  cloudbeaver:
+    image: dbeaver/cloudbeaver:latest
+    container_name: support-cloudbeaver
+    restart: unless-stopped
+    ports:
+      - "8978:8978"
+    volumes:
+      - cloudbeaver_data:/opt/cloudbeaver/workspace
+    depends_on:
+      - postgres
 
 volumes:
   pgdata:
+  cloudbeaver_data:

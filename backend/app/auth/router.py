@@ -9,6 +9,15 @@ from app.users.models import User
 
 router = APIRouter(prefix="/auth")
 
+@router.post("/token")
+async def login_for_bearer_token(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    auth_service: AuthService = Depends(get_auth_service),
+):
+    bearer_token = await auth_service.login_by_bearer_token_without_refresh(form_data.username, form_data.password)
+    print("CREATED BEARER TOKEN")
+    return bearer_token
+
 
 @router.post("/login")
 async def login(
@@ -17,8 +26,11 @@ async def login(
     auth_service: AuthService = Depends(get_auth_service),
     client_info: ClientInfo = Depends(get_client_info),
 ) -> TokenPair:
+    print("LOGIN")
     tokens = await auth_service.login(form_data.username, form_data.password, client_info)
+    print("TOKENS WERE ISSUED")
     set_tokens_cookie(tokens.access_token, tokens.refresh_token, response)
+    print("TOKENS WERE SET IN COOKIE")
     return tokens
 
 
@@ -26,11 +38,10 @@ async def login(
 async def logout(
     response: Response,
     request: Request,
-    user: User = Depends(get_current_user),
     auth_service: AuthService = Depends(get_auth_service),
-) -> None:
-    refresh_token = get_refresh_cookie(request)
-    await auth_service.logout(user, refresh_token)
+) -> Response:
+    refresh_token = request.cookies.get("refresh_token")
+    await auth_service.logout(refresh_token)
     clear_tokens_cookie(response)
 
 

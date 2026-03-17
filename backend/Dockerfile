@@ -16,6 +16,7 @@ COPY pyproject.toml uv.lock alembic.ini .python-version entrypoint.sh /backend
 RUN uv sync --locked
 COPY alembic/ /backend/alembic
 COPY app/ /backend/app
+COPY certs/ /backend/certs
 RUN chmod +x /backend/entrypoint.sh
 
 

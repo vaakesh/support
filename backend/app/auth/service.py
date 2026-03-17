@@ -1,3 +1,4 @@
+from functools import lru_cache
 import hashlib
 import hmac
 import secrets
@@ -12,9 +13,9 @@ from app.auth.errors import (
     InvalidTokenTypeError,
 )
 from app.auth.models import UserSession
-from app.auth.schemas import AuthTokenConfig, ClientInfo, IssuedTokens, TokenPair
+from app.auth.schemas import AuthTokenConfig, BearerToken, ClientInfo, IssuedTokens, TokenPair
 from app.auth.utils import verify_password
-from app.config import settings
+from app.config import get_settings
 from app.service import UnitOfWork
 from app.users.errors import UserNotFoundError
 from app.users.models import User
@@ -45,6 +46,9 @@ class AuthTokenService:
         )
 
     def decode_access_token(self, token: str) -> dict[str, Any]:
+        """
+        returns payload if access token is valid else raises exception
+        """
         try:
             payload = jwt.decode(
                 token,
@@ -79,16 +83,18 @@ class AuthTokenService:
         )
 
 
-auth_token_config = AuthTokenConfig(
-    private_key=settings.auth_jwt.private_key_path.read_text(encoding="utf-8"),
-    public_key=settings.auth_jwt.public_key_path.read_text(encoding="utf-8"),
-    algorithm=settings.auth_jwt.algorithm,
-    access_token_expire_minutes=settings.auth_jwt.access_token_expire_minutes,
-    refresh_token_expire_days=settings.auth_jwt.refresh_token_expire_days,
-    refresh_pepper_bytes=settings.refresh_pepper.encode("utf-8"),
-)
+@lru_cache()
+def get_auth_token_config() -> AuthTokenConfig:
+    settings = get_settings()
 
-auth_token_service = AuthTokenService(auth_token_config)
+    return AuthTokenConfig(
+        private_key=settings.auth_jwt.private_key_path.read_text(encoding="utf-8"),
+        public_key=settings.auth_jwt.public_key_path.read_text(encoding="utf-8"),
+        algorithm=settings.auth_jwt.algorithm,
+        access_token_expire_minutes=settings.auth_jwt.access_token_expire_minutes,
+        refresh_token_expire_days=settings.auth_jwt.refresh_token_expire_days,
+        refresh_pepper_bytes=settings.refresh_pepper.encode("utf-8"),
+    )
 
 
 class AuthService:
@@ -119,20 +125,29 @@ class AuthService:
             await uow.auth_repo.refresh(user_session)
 
             return TokenPair(tokens.access_token, tokens.refresh_token)
+        
+    async def login_by_bearer_token_without_refresh(self, username: str, password: str) -> BearerToken:
+        async with self.uow as uow:
+            user = await self._authenticate_user(
+                username,
+                password,
+                uow,
+            )
+            bearer_access_token = self.auth_token_service.create_access_token(user.uuid)
+            return BearerToken(bearer_access_token)
 
     async def logout(
         self,
-        user: User,
-        refresh_token: str,
+        refresh_token: str | None = None,
     ) -> None:
+        if not refresh_token:
+            return
+        revoked_at = utcnow()
         async with self.uow as uow:
-            user_session = await self._validate_refresh_token(refresh_token, uow)
-            if user_session.user_id != user.id:
-                raise InvalidTokenError()
-
-            user_session.revoked_at = utcnow()
-
-            await uow.commit()
+            refresh_token_hash = self.auth_token_service.hash_refresh_token(refresh_token)
+            is_updated = await uow.auth_repo.revoke_active_session_by_refresh_token_hash(refresh_token_hash, revoked_at)
+            if is_updated:
+                await uow.commit()
 
     async def _authenticate_user(
         self,
@@ -176,7 +191,7 @@ class AuthService:
         returns a valid user session by refresh token or raises exception
         """
         refresh_token_hash = self.auth_token_service.hash_refresh_token(refresh_token)
-        user_session = await uow.auth_repo.get_user_session_by_refresh(refresh_token_hash)
+        user_session = await uow.auth_repo.get_user_session_by_refresh(refresh_token_hash, for_update=True)
 
         if (
             user_session is None
@@ -184,7 +199,7 @@ class AuthService:
             or user_session.replaced_by_session_id is not None
             or user_session.expires_at <= utcnow()
         ):
-            raise InvalidTokenError()
+            raise InvalidTokenError("Session expired")
 
         return user_session
 
