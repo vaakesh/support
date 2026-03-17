@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm
 
@@ -7,6 +9,7 @@ from app.auth.schemas import ClientInfo, SessionOut, TokenPair
 from app.auth.service import AuthService
 from app.users.models import User
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth")
 
 @router.post("/token")
@@ -14,8 +17,9 @@ async def login_for_bearer_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
     auth_service: AuthService = Depends(get_auth_service),
 ):
+    logger.info("creating bearer token...")
     bearer_token = await auth_service.login_by_bearer_token_without_refresh(form_data.username, form_data.password)
-    print("CREATED BEARER TOKEN")
+    logger.info("created bearer token")
     return bearer_token
 
 
@@ -25,13 +29,12 @@ async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     auth_service: AuthService = Depends(get_auth_service),
     client_info: ClientInfo = Depends(get_client_info),
-) -> TokenPair:
-    print("LOGIN")
+) -> None:
+    logger.info("login...")
     tokens = await auth_service.login(form_data.username, form_data.password, client_info)
-    print("TOKENS WERE ISSUED")
+    logger.info("tokens issued")
     set_tokens_cookie(tokens.access_token, tokens.refresh_token, response)
-    print("TOKENS WERE SET IN COOKIE")
-    return tokens
+    logger.info("tokens set in cookie")
 
 
 @router.post("/logout")

@@ -11,7 +11,8 @@ class UserCreate(BaseModel):
 
 class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
+    
+    uuid: UUID
     username: str
     email: EmailStr
 

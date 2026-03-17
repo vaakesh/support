@@ -20,6 +20,7 @@ services:
       - ./backend/certs:/backend/certs
       - ./backend/uv.lock:/backend/uv.lock
       - ./backend/entrypoint.sh:/backend/entrypoint.sh
+      - ./backend/tests:/backend/tests
     restart: on-failure:10
   
   postgres:

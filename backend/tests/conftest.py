@@ -6,13 +6,13 @@ from httpx import ASGITransport, AsyncClient
 from app.main import create_app
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def app() -> FastAPI:
     return create_app()
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(scope="session")
 async def client(app):
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="https://test") as ac:
         yield ac

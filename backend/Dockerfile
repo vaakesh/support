@@ -15,6 +15,7 @@ RUN env UV_UNMANAGED_INSTALL="/usr/local/bin" sh /uv-installer.sh \
 COPY pyproject.toml uv.lock alembic.ini .python-version entrypoint.sh /backend
 RUN uv sync --locked
 COPY alembic/ /backend/alembic
+COPY tests/ /backend/tests
 COPY app/ /backend/app
 COPY certs/ /backend/certs
 RUN chmod +x /backend/entrypoint.sh
