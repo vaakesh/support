@@ -1,3 +1,4 @@
+import logging
 from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
@@ -8,6 +9,7 @@ from app.users.errors import PermissionDeniedError, UserAlreadyExistsError, User
 from app.users.models import User
 from app.users.schemas import UserCreate, UserUpdate
 
+logger = logging.getLogger(__name__)
 
 class UserService:
     def __init__(self, uow: UnitOfWork) -> None:
@@ -76,6 +78,7 @@ class UserService:
                 uow.user_repo.add(user)
                 await uow.commit()
                 await uow.user_repo.refresh(user)
+                logger.info(f"user created: {user.uuid}")
                 return user
         except IntegrityError as e:
             raise UserAlreadyExistsError() from e
@@ -108,6 +111,7 @@ class UserService:
 
                 if updated:
                     await uow.commit()
+                    logger.info(f"user updated: {target_user_uuid} by {current_user.uuid}")
 
                 return user
         except IntegrityError as e:
@@ -121,3 +125,4 @@ class UserService:
             user = await self._get_user_by_uuid(uow, user_uuid)
             await uow.user_repo.delete(user)
             await uow.commit()
+            logger.info(f"user deleted: {user_uuid} by {current_user.uuid}")

@@ -9,7 +9,6 @@ from app.users.models import User
 from app.users.schemas import UserCreate, UserMe, UserOut, UserUpdate
 from app.users.service import UserService
 
-logger = logging.getLogger(__name__)
 
 
 router = APIRouter(prefix="/users")
@@ -35,9 +34,7 @@ async def create_user(
     payload: UserCreate,
     user_service: UserService = Depends(get_user_service),
 ) -> User:
-    logger.info(f"creating user(username={payload.username})")
     user = await user_service.create_user(payload)
-    logger.info(f"user created(username={user.username})")
     return user
 
 
@@ -48,13 +45,11 @@ async def update_user(
     current_user: User = Depends(get_current_user),
     user_service: UserService = Depends(get_user_service),
 ):
-    logger.info("updating user")
     user = await user_service.update_user(
         current_user,
         user_uuid,
         payload,
     )
-    logger.info("user updated")
     return user
 
 
@@ -64,7 +59,5 @@ async def delete_user(
     current_user: User = Depends(get_current_user),
     user_service: UserService = Depends(get_user_service),
 ):
-    logger.info("deleting user")
     await user_service.delete_user(current_user, user_uuid)
-    logger.info("user deleted")
     return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -1,6 +1,7 @@
 from functools import lru_cache
 import hashlib
 import hmac
+import logging
 import secrets
 from datetime import timedelta
 from typing import Any
@@ -21,6 +22,7 @@ from app.users.errors import UserNotFoundError
 from app.users.models import User
 from app.utils import utcnow
 
+logger = logging.getLogger(__name__)
 
 class AuthTokenService:
     def __init__(self, config: AuthTokenConfig) -> None:
@@ -121,6 +123,7 @@ class AuthService:
             uow.auth_repo.add(user_session)
 
             await uow.commit()
+            logger.info(f"user logged in: {user.uuid}, ip={client_info.ip}")
 
             await uow.auth_repo.refresh(user_session)
 
@@ -148,6 +151,7 @@ class AuthService:
             is_updated = await uow.auth_repo.revoke_active_session_by_refresh_token_hash(refresh_token_hash, revoked_at)
             if is_updated:
                 await uow.commit()
+                logger.info("user logged out")
 
     async def _authenticate_user(
         self,
@@ -157,6 +161,7 @@ class AuthService:
     ) -> User:
         user = await uow.user_repo.get_by_username(username)
         if not user or not verify_password(password, user.hashed_password):
+            logger.warning(f"failed login attempt for username={username}")
             raise UserNotFoundError()
 
         return user
@@ -199,6 +204,7 @@ class AuthService:
             or user_session.replaced_by_session_id is not None
             or user_session.expires_at <= utcnow()
         ):
+            logger.warning("invalid or expired refresh token used")
             raise InvalidTokenError("Session expired")
 
         return user_session

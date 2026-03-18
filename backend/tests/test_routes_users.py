@@ -10,7 +10,6 @@ from app.users.deps import get_user_service
 from app.users.errors import PermissionDeniedError, UserNotFoundError
 from app.users.schemas import UserCreate, UserUpdate
 
-logger = logging.getLogger(__name__)
 
 
 class FakeUser:
@@ -69,7 +68,6 @@ class FakeUserService:
         return self._store_user(user)
 
     async def create_user(self, payload: UserCreate) -> FakeUser:
-        logger.info("FakeUserService.create_user called")
         user = FakeUser(
             username=payload.username,
             email=payload.email,
@@ -80,7 +78,6 @@ class FakeUserService:
     async def update_user(
         self, current_user, user_uuid: UUID, payload: UserUpdate
     ) -> FakeUser:
-        logger.info("FakeUserService.update_user called")
         if current_user.uuid != user_uuid and not current_user.is_admin:
             raise PermissionDeniedError()
 
@@ -98,7 +95,6 @@ class FakeUserService:
         return user
 
     async def get_by_uuid(self, user_uuid: UUID) -> FakeUser:
-        logger.info("FakeUserService.get_by_uuid called")
         user = self.users.get(user_uuid)
         if not user:
             raise UserNotFoundError()
@@ -106,17 +102,13 @@ class FakeUserService:
         return user
 
     async def delete_user(self, current_user: FakeUser, user_uuid: UUID):
-        logger.info("FakeUserService.delete_user called")
         if current_user.uuid != user_uuid and not current_user.is_admin:
-            logger.warning("permission denied")
             raise PermissionDeniedError()
 
         user = self.users.get(user_uuid)
         if not user:
-            logger.warning("user not found")
             raise UserNotFoundError()
 
-        logger.info("deleting user")
         del self.users[user_uuid]
 
     def print_users(self) -> None:

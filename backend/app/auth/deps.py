@@ -14,7 +14,6 @@ from app.users.deps import get_user_service
 from app.users.models import User
 from app.users.service import UserService
 
-logger = logging.getLogger(__name__)
 
 
 @lru_cache
@@ -33,7 +32,6 @@ async def get_bearer_token(token: str = Depends(oauth2_scheme)) -> BearerToken |
     """
     returns bearer token if found else None
     """
-    logger.info("checking bearer token")
     return token
 
 async def auth_user(
@@ -45,15 +43,12 @@ async def auth_user(
     if found none of them raises exception
     """
     if bearer_token is not None:
-        logger.info("bearer token found")
         return bearer_token
     
-    logger.info("bearer token is none, finding token in cookies")
 
     access_token = request.cookies.get("access_token")
 
     if access_token is None:
-        logger.warning("access token not found")
         raise AccessTokenNotFoundError()
     
     return access_token
@@ -67,7 +62,6 @@ async def get_current_user(
     """
     returns user by access token
     """
-    logger.info("getting current user")
     
     payload = auth_token_service.decode_access_token(access_token)
     user_uuid = UUID(payload.get("sub"))

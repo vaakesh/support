@@ -2,15 +2,17 @@ import logging
 
 import pytest
 import pytest_asyncio
-from fastapi import FastAPI
+from fastapi import FastAPI, status
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.pool import NullPool
 from app.config import get_settings
 from app.main import create_app
 from app.database import get_async_session_maker
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-from sqlalchemy import delete
+from sqlalchemy import text
 from app.users.models import User
+from tests.helpers import make_user_payload
+
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +49,7 @@ def app(session_maker):
     app.dependency_overrides.pop(get_async_session_maker, None)
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="function")
 async def client(app: FastAPI):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="https://test") as ac:
@@ -55,17 +57,49 @@ async def client(app: FastAPI):
 
 
 async def clear_db(session_maker, settings):
-    logger.info(f"clearing database {settings.db_name}...")
     assert settings.db_name == "support_test", (
-        f"refusting to clear non-test DB: {settings.db_name}"
+        f"refusing to clear non-test DB: {settings.db_name}"
     )
     async with session_maker() as session:
-        await session.execute(delete(User))
+        await session.execute(text("TRUNCATE TABLE users RESTART IDENTITY CASCADE"))
         await session.commit()
 
 
-@pytest_asyncio.fixture(autouse=True)
+@pytest_asyncio.fixture(autouse=True, scope="function")
 async def cleanup_db(session_maker, settings):
-    await clear_db(session_maker, settings)
     yield
     await clear_db(session_maker, settings)
+
+
+@pytest_asyncio.fixture(scope="function")
+async def existing_user(client):
+    payload = make_user_payload(username="current_user", email="currentuser@example.com")
+    response = await client.post("/users/", json=payload)
+    assert response.status_code == 201
+    data = response.json()
+    data["password"] = payload["password"]
+    return data
+
+@pytest_asyncio.fixture(scope="function")
+async def auth_cookies_client(client, existing_user):
+    # application/x-www-form-urlencoded
+    response = await client.post("/auth/login", data={
+        "username": existing_user["username"],
+        "password": "testpassword",
+    })
+    assert response.status_code == status.HTTP_200_OK
+    yield client
+    client.cookies.clear()
+
+@pytest_asyncio.fixture(scope="function")
+async def auth_bearer_client(client, existing_user):
+    response = await client.post("/auth/token", data={
+        "username": existing_user["username"],
+        "password": "testpassword",
+    })
+    assert response.status_code == status.HTTP_200_OK
+    token = response.json()["access_token"]
+
+    client.headers["Authorization"] = f"Bearer {token}"
+    yield client
+    client.headers.pop("Authorization", None)
