@@ -5,16 +5,10 @@ CERT_DIR="/backend/certs"
 PRIVATE_KEY="$CERT_DIR/jwt-private.pem"
 PUBLIC_KEY="$CERT_DIR/jwt-public.pem"
 
-if [ ! -f "$PRIVATE_KEY" ]; then
-    echo "Generating private/public key pair..."
-    uv run openssl genpkey -algorithm RSA -out "$PRIVATE_KEY" -pkeyopt rsa_keygen_bits:2048
-    uv run openssl rsa -pubout -in "$PRIVATE_KEY" -out "$PUBLIC_KEY"
-elif [ ! -f "$PUBLIC_KEY" ]; then
-    echo "Generating public key from existing private key..."
-    uv run openssl rsa -pubout -in "$PRIVATE_KEY" -out "$PUBLIC_KEY"
-else
-    echo "Keys already exist, skipping."
-fi
+[ -f "$PRIVATE_KEY" ] || { echo "Missing private key: $PRIVATE_KEY"; exit 1; }
+[ -f "$PUBLIC_KEY" ] || { echo "Missing public key: $PUBLIC_KEY"; exit 1; }
+
+exec "$@"
 
 cd /backend
 echo "Running migrations..."
