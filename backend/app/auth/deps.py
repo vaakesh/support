@@ -2,7 +2,7 @@ from functools import lru_cache
 import logging
 from uuid import UUID
 
-from fastapi import Depends, Request
+from fastapi import Depends, Request, WebSocket, WebSocketDisconnect
 from fastapi.security import OAuth2PasswordBearer
 
 from app.auth.errors import AccessTokenNotFoundError
@@ -52,6 +52,18 @@ async def auth_user(
         raise AccessTokenNotFoundError()
     
     return access_token
+
+async def auth_user_ws(
+    websocket: WebSocket,
+) -> str:
+    print(websocket.cookies, "COOOOOKIES")
+    access_token = websocket.cookies.get("access_token")
+
+    if not access_token:
+        await websocket.close(code=1008)
+        raise WebSocketDisconnect(code=1008)
+    
+    return access_token
     
 
 async def get_current_user(
@@ -69,6 +81,20 @@ async def get_current_user(
     user = await user_service.get_by_uuid(user_uuid)
     return user
 
+async def get_current_user_ws(
+    user_service: UserService = Depends(get_user_service),
+    access_token: str = Depends(auth_user_ws),
+    auth_token_service: AuthTokenService = Depends(get_auth_token_service)
+) -> User:
+    """
+    returns user by access token for websocket
+    """
+    
+    payload = auth_token_service.decode_access_token(access_token)
+    user_uuid = UUID(payload.get("sub"))
+
+    user = await user_service.get_by_uuid(user_uuid)
+    return user
 
 def get_client_info(request: Request) -> ClientInfo:
     return ClientInfo(

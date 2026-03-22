@@ -2,7 +2,7 @@ from collections.abc import AsyncGenerator
 import logging
 
 from fastapi import Depends
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.service import UnitOfWork
 
@@ -17,6 +17,6 @@ async def get_session(
 
 
 def get_uow(
-        session_maker = Depends(get_async_session_maker),
+        session_maker: async_sessionmaker[AsyncSession] = Depends(get_async_session_maker),
 ) -> UnitOfWork:
     return UnitOfWork(session_maker)

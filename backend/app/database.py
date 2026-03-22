@@ -10,7 +10,7 @@ def get_engine() -> AsyncEngine:
     settings = get_settings()
     return create_async_engine(
         settings.database_url(),
-        echo=True,
+        echo=False,
     )
 
 @lru_cache

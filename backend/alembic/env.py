@@ -26,6 +26,7 @@ target_metadata = Base.metadata
 from app.config import get_settings
 from app.auth.models import UserSession
 from app.users.models import User
+from app.tickets.models import Ticket, TicketMessage
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

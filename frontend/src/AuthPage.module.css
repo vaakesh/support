@@ -1,0 +1,254 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap');
+
+/* ── Reset & Root ─────────────────────────────────────────── */
+.root {
+    /* Перекрывает весь вьюпорт независимо от #root из index.css */
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #0a0a0a;
+    background-image:
+        radial-gradient(ellipse 80% 60% at 50% -10%, rgba(255, 220, 130, 0.07) 0%, transparent 60%),
+        radial-gradient(ellipse 40% 40% at 90% 90%, rgba(255, 200, 80, 0.04) 0%, transparent 50%);
+    font-family: 'DM Sans', sans-serif;
+    padding: 24px;
+    overflow-y: auto;
+}
+
+/* ── Panel ─────────────────────────────────────────────────── */
+.panel {
+    width: 100%;
+    max-width: 400px;
+    background: #111111;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 16px;
+    padding: 48px 44px 44px;
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.5),
+        0 32px 64px rgba(0, 0, 0, 0.6),
+        0 8px 24px rgba(0, 0, 0, 0.4);
+    animation: panelIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes panelIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ── Header ─────────────────────────────────────────────────── */
+.header {
+    margin-bottom: 36px;
+    animation: fadeUp 0.5s 0.1s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.logo {
+    font-size: 28px;
+    color: #c9a84c;
+    margin-bottom: 20px;
+    display: block;
+    line-height: 1;
+    filter: drop-shadow(0 0 12px rgba(201, 168, 76, 0.4));
+}
+
+.title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 28px;
+    font-weight: 400;
+    color: #f0ece4;
+    margin: 0 0 6px;
+    letter-spacing: -0.3px;
+    line-height: 1.2;
+}
+
+.subtitle {
+    font-size: 14px;
+    font-weight: 300;
+    color: #6b6762;
+    margin: 0;
+    letter-spacing: 0.1px;
+}
+
+/* ── Form ─────────────────────────────────────────────────── */
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* ── Field ─────────────────────────────────────────────────── */
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.field:nth-child(1) { animation-delay: 0.15s; }
+.field:nth-child(2) { animation-delay: 0.2s; }
+
+.label {
+    font-size: 11px;
+    font-weight: 500;
+    color: #5a5652;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.input {
+    width: 100%;
+    box-sizing: border-box;
+    background: #0e0e0e;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 13px 16px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    color: #e8e4dc;
+    outline: none;
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease,
+        background 0.2s ease;
+}
+
+.input::placeholder {
+    color: #3a3835;
+}
+
+.input:focus {
+    border-color: rgba(201, 168, 76, 0.5);
+    background: #0f0f0f;
+    box-shadow: 0 0 0 3px rgba(201, 168, 76, 0.08);
+}
+
+.input:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* ── Error ─────────────────────────────────────────────────── */
+.error {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(220, 80, 60, 0.08);
+    border: 1px solid rgba(220, 80, 60, 0.2);
+    border-radius: 8px;
+    padding: 11px 14px;
+    font-size: 13px;
+    color: #e07060;
+    font-weight: 400;
+    animation: shake 0.35s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+.errorIcon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(220, 80, 60, 0.5);
+    font-size: 11px;
+    font-weight: 600;
+    color: #e07060;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%       { transform: translateX(-5px); }
+    40%       { transform: translateX(5px); }
+    60%       { transform: translateX(-3px); }
+    80%       { transform: translateX(3px); }
+}
+
+/* ── Button ─────────────────────────────────────────────────── */
+.button {
+    position: relative;
+    width: 100%;
+    padding: 14px;
+    margin-top: 4px;
+    background: linear-gradient(135deg, #c9a84c 0%, #a8883a 100%);
+    color: #0a0a0a;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    overflow: hidden;
+    transition:
+        opacity 0.2s ease,
+        transform 0.15s ease,
+        box-shadow 0.2s ease;
+    animation: fadeUp 0.5s 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.button::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0);
+    transition: background 0.2s ease;
+    border-radius: inherit;
+}
+
+.button:not(:disabled):hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 24px rgba(201, 168, 76, 0.3);
+}
+
+.button:not(:disabled):hover::after {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.button:not(:disabled):active {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+.button:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* ── Spinner ────────────────────────────────────────────────── */
+.spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(10, 10, 10, 0.25);
+    border-top-color: #0a0a0a;
+    border-radius: 50%;
+    animation: spin 0.65s linear infinite;
+    vertical-align: middle;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ── Shared animation ────────────────────────────────────────── */
+@keyframes fadeUp {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

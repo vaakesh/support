@@ -8,7 +8,6 @@ PUBLIC_KEY="$CERT_DIR/jwt-public.pem"
 [ -f "$PRIVATE_KEY" ] || { echo "Missing private key: $PRIVATE_KEY"; exit 1; }
 [ -f "$PUBLIC_KEY" ] || { echo "Missing public key: $PUBLIC_KEY"; exit 1; }
 
-exec "$@"
 
 cd /backend
 echo "Running migrations..."

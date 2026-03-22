@@ -1,0 +1,34 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: study-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: study
+      POSTGRES_USER: study
+      POSTGRES_PASSWORD: study
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata_study:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d support"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  cloudbeaver:
+    image: dbeaver/cloudbeaver:latest
+    container_name: support-cloudbeaver
+    restart: unless-stopped
+    ports:
+      - "8978:8978"
+    volumes:
+      - cloudbeaver_study:/opt/cloudbeaver/workspace
+    depends_on:
+      - postgres
+
+volumes:
+  pgdata_study:
+  cloudbeaver_study:

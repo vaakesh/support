@@ -62,6 +62,19 @@ services:
       - cloudbeaver_data:/opt/cloudbeaver/workspace
     depends_on:
       - postgres
+  
+  frontend:
+    container_name: support-frontend
+    build:
+      context: frontend
+      dockerfile: Dockerfile
+    environment:
+      VITE_PROXY_TARGET: http://api:8000
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/frontend
+      - /frontend/node_modules
 
 volumes:
   pgdata:

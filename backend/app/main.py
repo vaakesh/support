@@ -1,25 +1,29 @@
-import logging
+from contextlib import asynccontextmanager
 
-from fastapi import APIRouter, FastAPI
+from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
 
+import app.models  # noqa: F401 # sqlalchemy models registration
 from app.auth.router import router as auth_router
 from app.exception_handlers import register_exception_handlers
+from app.logging_config import setup_logging
 from app.users.router import router as users_router
+from app.tickets.router import router as ticket_router
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(levelname)s | %(name)s | %(filename)s:%(lineno)d | %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
 
-def create_app() -> FastAPI:
 
-    app = FastAPI(debug=False)
+def create_app(*args, **kwargs) -> FastAPI:
+    app = FastAPI(*args, **kwargs)
 
     app.include_router(users_router)
     app.include_router(auth_router)
+    app.include_router(ticket_router)
     register_exception_handlers(app)
 
     return app
 
-app = create_app()
+setup_logging()
+app = create_app(lifespan=lifespan)
