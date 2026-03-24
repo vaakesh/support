@@ -1,13 +1,14 @@
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
 
 from app.auth.deps import get_current_user
 from app.users.deps import get_user_service
 from app.users.models import User
 from app.users.schemas import UserCreate, UserMe, UserOut, UserUpdate
 from app.users.service import UserService
+from app.utils import RateLimit
 
 
 
@@ -16,7 +17,9 @@ router = APIRouter(prefix="/users")
 
 @router.get("/me", response_model=UserMe)
 async def get_me(
+    request: Request,
     current_user: User = Depends(get_current_user),
+    _: None = Depends(RateLimit(5, 60)),
 ):
     return current_user
 

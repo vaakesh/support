@@ -32,6 +32,11 @@ class UserRepository(AbstractRepository[User]):
         stmt = select(User).where(User.uuid == user_uuid)
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
+    
+    async def get_by_uuid_for_update(self, user_uuid: UUID) -> User | None:
+        stmt = select(User).where(User.uuid == user_uuid).with_for_update()
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
 
     async def get_by_email(self, user_email: str) -> User | None:
         stmt = select(User).where(User.email == user_email)

@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 
 from app.auth.errors import InvalidTokenError
 from app.users.errors import PermissionDeniedError, UserAlreadyExistsError, UserNotFoundError
+from app.errors import TooManyRequestsError
 
 
 async def user_not_found_handler(
@@ -68,6 +69,14 @@ async def request_validation_handler(request: Request, exc: RequestValidationErr
         },
     )
 
+async def too_many_requests_handler(request: Request, exc: TooManyRequestsError):
+    return JSONResponse(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        content={
+            "message": str(exc),
+        },
+    )
+
 
 def register_exception_handlers(app: FastAPI):
     app.add_exception_handler(UserNotFoundError, user_not_found_handler)
@@ -76,3 +85,4 @@ def register_exception_handlers(app: FastAPI):
     app.add_exception_handler(Exception, unhandled_exception_handler)
     app.add_exception_handler(PermissionDeniedError, permission_denied_handler)
     app.add_exception_handler(RequestValidationError, request_validation_handler)
+    app.add_exception_handler(TooManyRequestsError, too_many_requests_handler)

@@ -1,28 +1,28 @@
 import logging
 from uuid import UUID
 
+from redis.asyncio import Redis
 from sqlalchemy.exc import IntegrityError
 
 from app.auth.utils import hash_password
 from app.service import UnitOfWork
 from app.users.errors import PermissionDeniedError, UserAlreadyExistsError, UserNotFoundError
 from app.users.models import User
-from app.users.schemas import UserCreate, UserUpdate
+from app.users.schemas import UserCreate, UserOut, UserUpdate
 
 logger = logging.getLogger(__name__)
 
 class UserService:
-    def __init__(self, uow: UnitOfWork) -> None:
+    def __init__(self, uow: UnitOfWork, redis: Redis) -> None:
         self.uow = uow
+        self.redis = redis
 
     async def get_by_uuid(self, user_uuid: UUID) -> User:
         """
         Returns user by uuid or raises exception
         """
         async with self.uow as uow:
-            user = await uow.user_repo.get_by_uuid(user_uuid)
-            if user is None:
-                raise UserNotFoundError(f"User with uuid={user_uuid} not found")
+            user = await self._get_user_by_uuid(uow, user_uuid)
             return user
 
     async def get_by_username(self, username: str) -> User:
@@ -56,9 +56,16 @@ class UserService:
             return user
 
     async def _get_user_by_uuid(self, uow: UnitOfWork, user_uuid: UUID) -> User:
+        cache_key = f"user:{user_uuid}"
+        cached = await self.redis.get(cache_key)
+        if cached:
+            return UserOut.model_validate_json(cached)
+        
         user = await uow.user_repo.get_by_uuid(user_uuid)
         if user is None:
             raise UserNotFoundError(f"User with uuid={user_uuid} not found")
+        
+        await self.redis.setex(cache_key, 300, UserOut.model_validate(user).model_dump_json())
         return user
 
     async def create_user(
@@ -93,7 +100,9 @@ class UserService:
             raise PermissionDeniedError()
         try:
             async with self.uow as uow:
-                user = await self._get_user_by_uuid(uow, target_user_uuid)
+                user = await uow.user_repo.get_by_uuid_for_update(target_user_uuid)
+                if user is None:
+                    raise UserNotFoundError()
                 update_data = payload.model_dump(exclude_unset=True)
                 updated = False
 
@@ -111,6 +120,8 @@ class UserService:
 
                 if updated:
                     await uow.commit()
+                    cache_key = f"user:{target_user_uuid}"
+                    await self.redis.delete(cache_key)
                     logger.info(f"user updated: {target_user_uuid} by {current_user.uuid}")
 
                 return user
@@ -122,7 +133,9 @@ class UserService:
             raise PermissionDeniedError()
         
         async with self.uow as uow:
-            user = await self._get_user_by_uuid(uow, user_uuid)
+            user = await uow.user_repo.get_by_uuid_for_update(user_uuid)
             await uow.user_repo.delete(user)
             await uow.commit()
+            cache_key = f"user:{user_uuid}"
+            await self.redis.delete(cache_key)
             logger.info(f"user deleted: {user_uuid} by {current_user.uuid}")

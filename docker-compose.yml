@@ -9,6 +9,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "8000:8000"
     volumes:
@@ -62,7 +64,44 @@ services:
       - cloudbeaver_data:/opt/cloudbeaver/workspace
     depends_on:
       - postgres
+  
+  frontend:
+    container_name: support-frontend
+    build:
+      context: frontend
+      dockerfile: Dockerfile
+    environment:
+      VITE_PROXY_TARGET: http://api:8000
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/frontend
+      - /frontend/node_modules
+
+  redis:
+    image: redis:7-alpine
+    container_name: support-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  
+  redisinsight:
+    image: redis/redisinsight:latest
+    container_name: support-redisinsight
+    ports:
+      - "5540:5540"
+    volumes:
+      - redisinsight:/data
 
 volumes:
   pgdata:
   cloudbeaver_data:
+  redis_data:
+  redisinsight:

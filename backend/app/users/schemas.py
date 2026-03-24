@@ -22,7 +22,6 @@ class UserMe(BaseModel):
     uuid: UUID
     username: str
     email: EmailStr
-    is_admin: bool
 
 class UserUpdate(BaseModel):
     username: str | None = Field(default=None, min_length=3, max_length=50)

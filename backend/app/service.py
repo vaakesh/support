@@ -2,6 +2,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 
 from app.auth.repository import AuthRepository
 from app.users.repository import UserRepository
+from app.tickets.repository import MessageRepository, TicketRepository
 
 
 class UnitOfWork:
@@ -10,11 +11,15 @@ class UnitOfWork:
         self.session: AsyncSession | None = None
         self.user_repo: UserRepository | None = None
         self.auth_repo: AuthRepository | None = None
+        self.ticket_repo: TicketRepository | None = None
+        self.message_repo: MessageRepository | None = None
 
     async def __aenter__(self):
         self.session = self._async_session_maker()
         self.user_repo = UserRepository(self.session)
         self.auth_repo = AuthRepository(self.session)
+        self.ticket_repo = TicketRepository(self.session)
+        self.message_repo = MessageRepository(self.session)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):

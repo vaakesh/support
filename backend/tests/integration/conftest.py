@@ -19,7 +19,9 @@ logger = logging.getLogger(__name__)
 
 @pytest.fixture(scope="session")
 def settings():
-    return get_settings()
+    settings = get_settings()
+    if settings.db_name != "support_test":
+        pytest.exit(f"Tests aborted: wrong database configured: got \"{settings.db_name}\", expected \"support_test\"")
 
 
 @pytest_asyncio.fixture(scope="session")

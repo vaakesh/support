@@ -8,6 +8,7 @@ from app.auth.deps import get_auth_service, get_client_info, get_current_user
 from app.auth.schemas import ClientInfo, SessionOut, TokenPair
 from app.auth.service import AuthService
 from app.users.models import User
+from app.utils import RateLimit
 
 router = APIRouter(prefix="/auth")
 
@@ -26,6 +27,7 @@ async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     auth_service: AuthService = Depends(get_auth_service),
     client_info: ClientInfo = Depends(get_client_info),
+    _: None = Depends(RateLimit(3, 60)),
 ) -> None:
     tokens = await auth_service.login(form_data.username, form_data.password, client_info)
     set_tokens_cookie(tokens.access_token, tokens.refresh_token, response)
@@ -48,6 +50,7 @@ async def refresh(
     request: Request,
     auth_service: AuthService = Depends(get_auth_service),
     client_info: ClientInfo = Depends(get_client_info),
+    _: None = Depends(RateLimit(10, 60)),
 ) -> TokenPair:
     refresh_token = get_refresh_cookie(request)
     tokens = await auth_service.refresh(refresh_token, client_info)

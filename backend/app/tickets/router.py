@@ -1,0 +1,136 @@
+
+
+
+
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from sqlalchemy import select
+
+from app.tickets.schemas import MessageCreate, MessageOut, TicketCreate, TicketFilter, TicketOut, TicketStatusUpdate
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.deps import get_session
+from app.tickets.models import Ticket
+from app.auth.deps import get_current_user, get_current_user_ws
+from app.users.models import User
+from app.tickets.service import MessageService, TicketService
+from app.tickets.deps import get_message_service, get_ticket_filter, get_ticket_service
+from app.tickets.ws import ConnectionManager, get_connection_manager
+
+router = APIRouter(prefix="/tickets")
+
+@router.websocket("/{ticket_uuid}/ws")
+async def ticket_chat_ws(
+    ticket_uuid: UUID,
+    ws: WebSocket,
+    current_user: User = Depends(get_current_user_ws),
+    connection_manager: ConnectionManager = Depends(get_connection_manager),
+):
+    key = ticket_uuid
+    await connection_manager.connect(key, ws)
+
+    await ws.send_json({
+        "event": "connected",
+        "message": f"You joined to ticket {ticket_uuid}",
+    })
+
+    await connection_manager.broadcast(key, {
+        "event": "user_joined",
+        "message": "User joined",
+    }, sender=ws)
+
+    try:
+        while True:
+            message = await ws.receive_text()
+
+            await connection_manager.broadcast(key, {
+                "event": "message",
+                "message": message,
+            }, sender=ws)
+    except WebSocketDisconnect:
+        connection_manager.disconnect(ticket_uuid, ws)
+
+        await connection_manager.broadcast(key, {
+            "event": "user_left",
+            "message": "User left",
+        })
+
+@router.get("", response_model=list[TicketOut])
+async def get_tickets_filtered(
+    filter: TicketFilter = Depends(get_ticket_filter),
+    ticket_service: TicketService = Depends(get_ticket_service),
+):
+    return await ticket_service.get_tickets_filtered(filter)
+
+@router.get("/all", response_model=list[TicketOut])
+async def get_all_tickets(
+    ticket_service: TicketService = Depends(get_ticket_service),
+) -> list[TicketOut]:
+    tickets = await ticket_service.get_all()
+    return tickets
+
+@router.get("/{ticket_uuid}", response_model=TicketOut)
+async def get_ticket(
+    ticket_uuid: UUID,
+    ticket_service: TicketService = Depends(get_ticket_service),
+) -> TicketOut:
+    ticket = await ticket_service.get_by_uuid(ticket_uuid)
+    return ticket
+
+@router.get("/{ticket_uuid}/view", response_model=TicketOut)
+async def view_ticket(
+    ticket_uuid: UUID,
+    ticket_service: TicketService = Depends(get_ticket_service),
+) -> TicketOut:
+    ticket = await ticket_service.mark_viewed(ticket_uuid)
+    return ticket
+
+@router.patch("/{ticket_uuid}/status", response_model=TicketOut)
+async def update_ticket_status(
+    ticket_uuid: UUID,
+    payload: TicketStatusUpdate,
+    current_user: User = Depends(get_current_user),
+    ticket_service: TicketService = Depends(get_ticket_service),
+):
+    ticket = await ticket_service.change_status(ticket_uuid, payload.status, current_user)
+    return ticket
+
+@router.get("/{ticket_uuid}/messages", response_model=list[MessageOut])
+async def get_messages_by_ticket(
+    ticket_uuid: UUID,
+    current_user: User = Depends(get_current_user),
+    message_service: MessageService = Depends(get_message_service),
+):
+    messages = await message_service.get_all_messages_by_ticket(ticket_uuid, current_user.id)
+    return messages
+
+@router.post("/{ticket_uuid}/messages", response_model=MessageOut)
+async def send_message(
+    ticket_uuid: UUID,
+    payload: MessageCreate,
+    current_user: User = Depends(get_current_user),
+    message_service: MessageService = Depends(get_message_service),
+):
+    message = await message_service.send_message(payload, ticket_uuid, current_user.id)
+    return message
+
+
+@router.post("/", response_model=TicketOut)
+async def create_ticket(
+    payload: TicketCreate,
+    current_user: User = Depends(get_current_user),
+    ticket_service: TicketService = Depends(get_ticket_service),
+):
+    ticket = await ticket_service.create_ticket(payload, current_user.id)
+    return ticket
+
+@router.patch("/assign/{ticket_uuid}", response_model=TicketOut)
+async def assign_ticket_to_support_agent(
+    ticket_uuid: UUID,
+    support_agent_id: int,
+    ticket_service: TicketService = Depends(get_ticket_service),
+):
+    ticket = await ticket_service.assign_ticket(ticket_uuid, support_agent_id)
+    return ticket
