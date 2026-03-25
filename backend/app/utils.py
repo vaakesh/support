@@ -22,9 +22,10 @@ def format_duration(duration: float) -> str:
     return f"{color}{duration:.3f}s{reset}"
 
 class RateLimit:
-    def __init__(self, limit: int, window_seconds: int):
+    def __init__(self, limit: int, window_seconds: int, path: str):
         self.limit = limit
         self.window_seconds = window_seconds
+        self.path = path
 
     async def __call__(
         self,
@@ -33,7 +34,7 @@ class RateLimit:
     ):
         keys = [request.client.host]
         for key in keys:
-            redis_key = f"rate_limit:{key}"
+            redis_key = f"rate_limit:{self.path}:{key}"
             count = await redis.incr(redis_key, amount = 1)
             print(redis_key, count)
             if count == 1:

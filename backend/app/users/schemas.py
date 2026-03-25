@@ -1,7 +1,23 @@
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
+from app.users.models import UserRole
+
+
+class UserSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    uuid: UUID
+    username: str
+    role: UserRole
+    email: EmailStr
+    created_at: datetime
+    updated_at: datetime
+    is_admin: bool
+    is_active: bool
 
 class UserCreate(BaseModel):
     username: str = Field(min_length=3, max_length=50)

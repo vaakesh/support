@@ -5,12 +5,12 @@
 import json
 from uuid import UUID
 
-from redis import Redis
+from redis.asyncio import Redis
 
 from app.service import UnitOfWork
 from app.tickets.models import Ticket, TicketMessage, TicketStatus
 from app.tickets.errors import InvalidStatusTransitionError, TicketNotAssignedError, TicketNotFoundError
-from app.tickets.schemas import MessageCreate, TicketCreate, TicketFilter, TicketOut
+from app.tickets.schemas import MessageCreate, TicketCreate, TicketFilter, TicketOut, TicketSchema
 from app.tickets.utils import ALLOWED_TRANSITIONS, calculate_first_response_due_at, calculate_resolve_due_at
 from app.utils import utcnow
 from sqlalchemy.exc import IntegrityError
@@ -29,6 +29,7 @@ class MessageService:
                 raise TicketNotFoundError(f"Ticket with uuid={ticket_uuid} not found")
             if ticket.customer_id != current_user_id and ticket.assigned_to_id != current_user_id:
                 raise PermissionDeniedError()
+            return ticket
     
     async def get_all_messages_by_ticket(self, ticket_uuid: UUID, current_user_id: int) -> list[TicketMessage]:
         async with self.uow as uow:
@@ -55,7 +56,7 @@ class TicketService:
         self.uow = uow
         self.redis = redis
     
-    async def change_status(self, ticket_uuid: UUID, new_status: TicketStatus, current_user: User) -> Ticket:
+    async def change_status(self, ticket_uuid: UUID, new_status: TicketStatus, current_user: User) -> TicketSchema:
         async with self.uow as uow:
             ticket = await self._get_by_uuid_for_update(uow, ticket_uuid)
             if ticket.support_agent is None:
@@ -76,22 +77,32 @@ class TicketService:
             ticket.status = new_status
             await uow.commit()
             cache_key = f"ticket:{ticket_uuid}"
-            await self.redis.setex(cache_key, 300, TicketOut.model_validate(ticket).model_dump_json())
-            return ticket
+            await self.redis.delete(cache_key)
+            return TicketSchema.model_validate(ticket)
             
-            
-
-
-    async def get_by_uuid(self, ticket_uuid: UUID) -> Ticket:
+    async def get_by_uuid(self, ticket_uuid: UUID) -> TicketSchema:
         async with self.uow as uow:
-            return await self._get_by_uuid(uow, ticket_uuid)
+            cache_key = f"ticket:{ticket_uuid}"
+            cached = await self.redis.get(cache_key)
+            if cached:
+                return TicketSchema.model_validate_json(cached)
+            
+            ticket = await self._get_by_uuid(uow, ticket_uuid)
+
+            ticket_json = TicketSchema.model_validate(ticket).model_dump_json()
+            await self.redis.setex(
+                cache_key,
+                300,
+                ticket_json,
+            )
+            return TicketSchema.model_validate(ticket)
         
-    async def get_all(self, limit: int = 200) -> Ticket:
+    async def get_all(self, limit: int = 200) -> list[TicketSchema]:
         async with self.uow as uow:
             tickets = await uow.ticket_repo.get_all(limit)
-            return tickets
+            return [TicketSchema.model_validate(ticket) for ticket in tickets]
         
-    async def create_ticket(self, payload: TicketCreate, current_user_id: int) -> Ticket:
+    async def create_ticket(self, payload: TicketCreate, current_user_id: int) -> TicketSchema:
         try:
             async with self.uow as uow:
                 now = utcnow()
@@ -110,28 +121,29 @@ class TicketService:
 
                 created_ticket = await uow.ticket_repo.get_by_uuid(ticket.uuid)
 
-                return created_ticket
+                return TicketSchema.model_validate(created_ticket)
         except IntegrityError:
             raise
 
-    async def get_tickets_filtered(self, filter: TicketFilter) -> list[Ticket]:
+    async def get_tickets_filtered(self, filter: TicketFilter) -> list[TicketSchema]:
         async with self.uow as uow:
             tickets = await uow.ticket_repo.get_tickets_filtered(filter)
-            return tickets
+            return [TicketSchema.model_validate(ticket) for ticket in tickets]
         
-    async def assign_ticket(self, ticket_uuid: UUID, support_agent_id: int):
+    async def assign_ticket(self, ticket_uuid: UUID, support_agent_id: int) -> TicketSchema:
         try:
             async with self.uow as uow:
                 is_updated = await uow.ticket_repo.assign_ticket(ticket_uuid, support_agent_id) # пофиксить non-existent ticket_uuid, support_agent_id, ...
                 if is_updated:
                     ticket = await self._get_by_uuid(uow, ticket_uuid)
                     await uow.commit()
-                    await self.redis.delete(f"ticket:{ticket_uuid}")
-                    return ticket
+                    cache_key = f"ticket:{ticket_uuid}"
+                    await self.redis.delete(cache_key)
+                    return TicketSchema.model_validate(ticket)
         except IntegrityError: # разделить ошибки
             raise
 
-    async def mark_viewed(self, ticket_uuid: UUID) -> Ticket:
+    async def mark_viewed(self, ticket_uuid: UUID) -> TicketSchema:
         async with self.uow as uow:
             ticket = await self._get_by_uuid_for_update(uow, ticket_uuid)
 
@@ -139,24 +151,14 @@ class TicketService:
                 ticket.status = TicketStatus.OPEN
 
             await uow.commit()
-            await self.redis.delete(f"ticket:{ticket_uuid}")
-            return ticket
+            cache_key = f"ticket:{ticket_uuid}"
+            await self.redis.delete(cache_key)
+            return TicketSchema.model_validate(ticket)
 
     async def _get_by_uuid(self, uow: UnitOfWork, ticket_uuid: UUID) -> Ticket:
-        cache_key = f"ticket:{ticket_uuid}"
-        cached = await self.redis.get(cache_key)
-        if cached:
-            return TicketOut.model_validate_json(cached)
-        
         ticket = await uow.ticket_repo.get_by_uuid(ticket_uuid)
         if ticket is None:
             raise TicketNotFoundError(f"Ticket with uuid={ticket_uuid} not found")
-        ticket_json = TicketOut.model_validate(ticket).model_dump_json()
-        await self.redis.setex(
-            cache_key,
-            300,
-            ticket_json,
-        )
         return ticket
     
     async def _get_by_uuid_for_update(self, uow: UnitOfWork, ticket_uuid: UUID) -> Ticket:

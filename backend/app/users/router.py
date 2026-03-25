@@ -19,7 +19,7 @@ router = APIRouter(prefix="/users")
 async def get_me(
     request: Request,
     current_user: User = Depends(get_current_user),
-    _: None = Depends(RateLimit(5, 60)),
+    _: None = Depends(RateLimit(5, 60, "users/me")),
 ):
     return current_user
 

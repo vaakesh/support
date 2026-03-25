@@ -8,7 +8,7 @@ from app.auth.utils import hash_password
 from app.service import UnitOfWork
 from app.users.errors import PermissionDeniedError, UserAlreadyExistsError, UserNotFoundError
 from app.users.models import User
-from app.users.schemas import UserCreate, UserOut, UserUpdate
+from app.users.schemas import UserCreate, UserOut, UserSchema, UserUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -17,12 +17,20 @@ class UserService:
         self.uow = uow
         self.redis = redis
 
-    async def get_by_uuid(self, user_uuid: UUID) -> User:
+    async def get_by_uuid(self, user_uuid: UUID) -> UserSchema:
         """
         Returns user by uuid or raises exception
         """
+        cache_key = f"user:{user_uuid}"
+        cached = await self.redis.get(cache_key)
+        if cached:
+            return UserSchema.model_validate_json(cached)
+        
         async with self.uow as uow:
             user = await self._get_user_by_uuid(uow, user_uuid)
+            user = UserSchema.model_validate(user)
+
+            await self.redis.setex(cache_key, 300, user.model_dump_json())
             return user
 
     async def get_by_username(self, username: str) -> User:
@@ -56,22 +64,15 @@ class UserService:
             return user
 
     async def _get_user_by_uuid(self, uow: UnitOfWork, user_uuid: UUID) -> User:
-        cache_key = f"user:{user_uuid}"
-        cached = await self.redis.get(cache_key)
-        if cached:
-            return UserOut.model_validate_json(cached)
-        
         user = await uow.user_repo.get_by_uuid(user_uuid)
         if user is None:
             raise UserNotFoundError(f"User with uuid={user_uuid} not found")
-        
-        await self.redis.setex(cache_key, 300, UserOut.model_validate(user).model_dump_json())
         return user
 
     async def create_user(
         self,
         payload: UserCreate,
-    ) -> User:
+    ) -> UserSchema:
         """
         creates and returns user or raises exception if user exists
         """
@@ -85,8 +86,7 @@ class UserService:
                 uow.user_repo.add(user)
                 await uow.commit()
                 await uow.user_repo.refresh(user)
-                logger.info(f"user created: {user.uuid}")
-                return user
+                return UserSchema.model_validate(user)
         except IntegrityError as e:
             raise UserAlreadyExistsError() from e
 
@@ -95,7 +95,7 @@ class UserService:
         current_user: User,
         target_user_uuid: UUID,
         payload: UserUpdate,
-    ) -> User:
+    ) -> UserSchema:
         if current_user.uuid != target_user_uuid and not current_user.is_admin:
             raise PermissionDeniedError()
         try:
@@ -122,9 +122,8 @@ class UserService:
                     await uow.commit()
                     cache_key = f"user:{target_user_uuid}"
                     await self.redis.delete(cache_key)
-                    logger.info(f"user updated: {target_user_uuid} by {current_user.uuid}")
 
-                return user
+                return UserSchema.model_validate(user)
         except IntegrityError as e:
             raise UserAlreadyExistsError() from e
 
@@ -134,8 +133,9 @@ class UserService:
         
         async with self.uow as uow:
             user = await uow.user_repo.get_by_uuid_for_update(user_uuid)
+            if user is None:
+                return
             await uow.user_repo.delete(user)
             await uow.commit()
             cache_key = f"user:{user_uuid}"
             await self.redis.delete(cache_key)
-            logger.info(f"user deleted: {user_uuid} by {current_user.uuid}")

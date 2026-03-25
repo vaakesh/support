@@ -27,7 +27,7 @@ async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     auth_service: AuthService = Depends(get_auth_service),
     client_info: ClientInfo = Depends(get_client_info),
-    _: None = Depends(RateLimit(3, 60)),
+    _: None = Depends(RateLimit(3, 60, "auth/login")),
 ) -> None:
     tokens = await auth_service.login(form_data.username, form_data.password, client_info)
     set_tokens_cookie(tokens.access_token, tokens.refresh_token, response)
@@ -50,7 +50,7 @@ async def refresh(
     request: Request,
     auth_service: AuthService = Depends(get_auth_service),
     client_info: ClientInfo = Depends(get_client_info),
-    _: None = Depends(RateLimit(10, 60)),
+    _: None = Depends(RateLimit(10, 60, "auth/refresh")),
 ) -> TokenPair:
     refresh_token = get_refresh_cookie(request)
     tokens = await auth_service.refresh(refresh_token, client_info)

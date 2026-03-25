@@ -1,7 +1,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, computed_field
+from pydantic import BaseModel, ConfigDict
 import uuid
 
 from app.tickets.models import (
@@ -9,10 +9,46 @@ from app.tickets.models import (
     TicketPriority,
     TicketCategory,
 )
-from app.users.schemas import UserOut
+from app.users.schemas import UserOut, UserSchema
 
 
+class TicketSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
 
+    id: int
+    uuid: uuid.UUID
+    subject: str
+    description: str
+    status: TicketStatus
+    priority: TicketPriority
+    category: TicketCategory
+
+    customer_id: int
+    assigned_to_id: int | None
+
+    first_response_due_at: datetime | None
+    resolve_due_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+    first_responded_at: datetime | None
+    resolved_at: datetime | None
+    closed_at: datetime | None
+
+    customer: UserSchema
+    support_agent: UserSchema | None
+
+class MessageSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    uuid: uuid.UUID
+    ticket_id: int
+    author_id: int
+    body: str
+    created_at: datetime
+    updated_at: datetime
+
+    author: UserSchema
 
 class TicketOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
