@@ -3,13 +3,14 @@ import AuthPage from "./AuthPage";
 import WebSocketDemo from "./WebSocket";
 import {BrowserRouter, Navigate, Route, Routes, useLocation, } from "react-router-dom";
 import { useAuth } from "./auth/AuthContext";
+import AllTicketsPage from "./AllTicketsPage";
 
 function App() {
     return (
         <BrowserRouter>
             <Routes>
                 <Route path="/ws/:ticket_uuid" element={<PrivateRoute> <WebSocketDemo /> </PrivateRoute>} />
-                <Route path="/" element={<PrivateRoute> </PrivateRoute>} />
+                <Route path="/" element={<PrivateRoute><AllTicketsPage /></PrivateRoute>} />
                 <Route path="/login" element={<AuthPage />} />
             </Routes>
         </BrowserRouter>

@@ -1,0 +1,211 @@
+.page {
+  min-height: 100vh;
+  background: #0f1117;
+  padding: 40px 32px;
+  font-family: "IBM Plex Mono", "Courier New", monospace;
+  color: #e2e8f0;
+}
+
+/* ── Header ── */
+.header {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin-bottom: 32px;
+  border-bottom: 1px solid #2a2d3a;
+  padding-bottom: 20px;
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  margin: 0;
+  color: #f1f5f9;
+}
+
+.count {
+  font-size: 13px;
+  background: #1e2130;
+  border: 1px solid #2e3347;
+  color: #7c8db5;
+  border-radius: 20px;
+  padding: 2px 10px;
+}
+
+/* ── Grid ── */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+/* ── Card ── */
+.card {
+  background: #161923;
+  border: 1px solid #252836;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color 0.2s, transform 0.15s;
+}
+
+.card:hover {
+  border-color: #3d4466;
+  transform: translateY(-2px);
+}
+
+.cardTop {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── Priority badges ── */
+.priority {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+}
+
+.priority_low    { color: #6ee7b7; border-color: #1e4d3a; background: #0d2d22; }
+.priority_medium { color: #fbbf24; border-color: #4d3a0d; background: #2d210d; }
+.priority_high   { color: #fb923c; border-color: #4d2a0d; background: #2d170d; }
+.priority_critical { color: #f87171; border-color: #4d1a1a; background: #2d0d0d; }
+
+/* ── Status badges ── */
+.status {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+}
+
+.status_open     { color: #93c5fd; border-color: #1e3a5f; background: #0d1f38; }
+.status_pending  { color: #c4b5fd; border-color: #3a1e5f; background: #1f0d38; }
+.status_resolved { color: #6ee7b7; border-color: #1e4d3a; background: #0d2d22; }
+.status_closed   { color: #94a3b8; border-color: #2e3347; background: #1a1d2a; }
+
+/* ── Text ── */
+.subject {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+  color: #f1f5f9;
+  line-height: 1.4;
+}
+
+.description {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── Meta ── */
+.meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  background: #0f1117;
+  border-radius: 8px;
+  border: 1px solid #1e2130;
+}
+
+.metaRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+
+.metaLabel {
+  color: #475569;
+}
+
+.metaValue {
+  color: #94a3b8;
+  font-weight: 500;
+  text-align: right;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Chat button ── */
+.chatBtn {
+  margin-top: auto;
+  background: #1e2540;
+  color: #93c5fd;
+  border: 1px solid #2a3560;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.chatBtn:hover {
+  background: #253060;
+  border-color: #3d50a0;
+  color: #bfdbfe;
+}
+
+/* ── States ── */
+.center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  gap: 16px;
+  background: #0f1117;
+  font-family: "IBM Plex Mono", "Courier New", monospace;
+}
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid #252836;
+  border-top-color: #93c5fd;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loadingText {
+  font-size: 14px;
+  color: #475569;
+}
+
+.error {
+  color: #f87171;
+  font-size: 15px;
+}
+
+.empty {
+  color: #475569;
+  font-size: 15px;
+  text-align: center;
+  padding: 60px 0;
+}
