@@ -1,19 +1,28 @@
 .page {
   min-height: 100vh;
+  height: 100%;
+  overflow-y: auto;
   background: #0f1117;
   padding: 40px 32px;
   font-family: "IBM Plex Mono", "Courier New", monospace;
   color: #e2e8f0;
+  box-sizing: border-box;
 }
 
 /* ── Header ── */
 .header {
   display: flex;
-  align-items: baseline;
-  gap: 14px;
-  margin-bottom: 32px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
   border-bottom: 1px solid #2a2d3a;
   padding-bottom: 20px;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
 }
 
 .title {
@@ -31,6 +40,166 @@
   color: #7c8db5;
   border-radius: 20px;
   padding: 2px 10px;
+}
+
+/* ── Filter toggle button ── */
+.filterToggle {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid #2e3347;
+  background: #161923;
+  color: #7c8db5;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.filterToggle:hover {
+  border-color: #3d4466;
+  color: #93c5fd;
+}
+
+.filterToggleActive {
+  border-color: #3d50a0;
+  color: #93c5fd;
+  background: #1a2040;
+}
+
+/* ── Filter panel ── */
+.filterPanel {
+  background: #161923;
+  border: 1px solid #252836;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.filterRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.filterGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.filterLabel {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #475569;
+}
+
+.filterInput {
+  font-family: inherit;
+  font-size: 13px;
+  background: #0f1117;
+  border: 1px solid #252836;
+  border-radius: 6px;
+  color: #e2e8f0;
+  padding: 8px 12px;
+  outline: none;
+  transition: border-color 0.2s;
+  color-scheme: dark;
+}
+
+.filterInput:focus {
+  border-color: #3d4466;
+}
+
+.filterInput::placeholder {
+  color: #3a4060;
+}
+
+/* ── Chips ── */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 20px;
+  border: 1px solid #2e3347;
+  background: #0f1117;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.chip:hover {
+  border-color: #3d4466;
+  color: #94a3b8;
+}
+
+.chipActive {
+  background: #1e2540;
+  border-color: #3d50a0;
+  color: #93c5fd;
+}
+
+/* Priority chip accent colours when active */
+.chipPriority_low.chipActive    { background: #0d2d22; border-color: #1e4d3a; color: #6ee7b7; }
+.chipPriority_medium.chipActive { background: #2d210d; border-color: #4d3a0d; color: #fbbf24; }
+.chipPriority_high.chipActive   { background: #2d170d; border-color: #4d2a0d; color: #fb923c; }
+.chipPriority_critical.chipActive { background: #2d0d0d; border-color: #4d1a1a; color: #f87171; }
+
+/* ── Filter actions ── */
+.filterActions {
+  display: flex;
+  gap: 10px;
+  padding-top: 4px;
+  border-top: 1px solid #1e2130;
+}
+
+.btnApply {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: 1px solid #3d50a0;
+  background: #1e2540;
+  color: #93c5fd;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btnApply:hover {
+  background: #253060;
+  color: #bfdbfe;
+}
+
+.btnReset {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: 1px solid #2e3347;
+  background: transparent;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btnReset:hover {
+  border-color: #3d4466;
+  color: #64748b;
 }
 
 /* ── Grid ── */
@@ -74,9 +243,9 @@
   border: 1px solid transparent;
 }
 
-.priority_low    { color: #6ee7b7; border-color: #1e4d3a; background: #0d2d22; }
-.priority_medium { color: #fbbf24; border-color: #4d3a0d; background: #2d210d; }
-.priority_high   { color: #fb923c; border-color: #4d2a0d; background: #2d170d; }
+.priority_low      { color: #6ee7b7; border-color: #1e4d3a; background: #0d2d22; }
+.priority_medium   { color: #fbbf24; border-color: #4d3a0d; background: #2d210d; }
+.priority_high     { color: #fb923c; border-color: #4d2a0d; background: #2d170d; }
 .priority_critical { color: #f87171; border-color: #4d1a1a; background: #2d0d0d; }
 
 /* ── Status badges ── */
@@ -174,10 +343,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 100vh;
+  padding: 80px 0;
   gap: 16px;
-  background: #0f1117;
-  font-family: "IBM Plex Mono", "Courier New", monospace;
 }
 
 .spinner {
