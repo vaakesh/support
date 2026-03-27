@@ -4,7 +4,7 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, Request, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
 
 from app.tickets.schemas import MessageCreate, MessageOut, TicketCreate, TicketFilter, TicketOut, TicketStatusUpdate
@@ -28,34 +28,22 @@ async def ticket_chat_ws(
     current_user: User = Depends(get_current_user_ws),
     connection_manager: ConnectionManager = Depends(get_connection_manager),
 ):
-    key = ticket_uuid
-    await connection_manager.connect(key, ws)
-
-    await ws.send_json({
-        "event": "connected",
-        "message": f"You joined to ticket {ticket_uuid}",
-    })
-
-    await connection_manager.broadcast(key, {
-        "event": "user_joined",
-        "message": "User joined",
-    }, sender=ws)
+    key = str(ticket_uuid)
+    user_uuid = str(current_user.uuid)
+    await connection_manager.connect(key, ws, user_uuid)
 
     try:
         while True:
-            message = await ws.receive_text()
-
-            await connection_manager.broadcast(key, {
-                "event": "message",
-                "message": message,
-            }, sender=ws)
+            data = await ws.receive_json() # получаем сообщение
+            data["sender_uuid"] = user_uuid
+            data["username"] = current_user.username
+            await connection_manager.broadcast(
+                ticket_uuid,
+                data,
+                ws,
+            )
     except WebSocketDisconnect:
-        connection_manager.disconnect(ticket_uuid, ws)
-
-        await connection_manager.broadcast(key, {
-            "event": "user_left",
-            "message": "User left",
-        })
+        connection_manager.disconnect(key, ws, user_uuid)
 
 @router.get("", response_model=list[TicketOut])
 async def get_tickets_filtered(

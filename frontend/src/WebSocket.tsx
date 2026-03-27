@@ -4,72 +4,94 @@ import { refreshTokens } from "./api/auth";
 import styles from "./WebSocket.module.css";
 import { useAuth } from "./auth/AuthContext";
 
-type LogEntry = {
-    time: string;
+type ChatMessage = {
+    id: number;
+    username: string;
     text: string;
-    type: "info" | "sent" | "recv" | "error";
+    time: string;
+    isSelf: boolean;
 };
 
 export default function WebSocketDemo() {
-    const { logout } = useAuth();
+    const { user, logout } = useAuth();
     const navigate = useNavigate();
     const { ticket_uuid } = useParams<{ ticket_uuid: string }>();
     const url = `ws://localhost:8000/tickets/${ticket_uuid}/ws`;
+
     const [message, setMessage] = useState("");
-    const [log, setLog] = useState<LogEntry[]>([]);
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [connected, setConnected] = useState(false);
+    const [connecting, setConnecting] = useState(false);
+
     const socketRef = useRef<WebSocket | null>(null);
-    const logEndRef = useRef<HTMLDivElement>(null);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const idCounter = useRef(0);
 
     useEffect(() => {
-        logEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [log]);
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [messages]);
 
-    const addLog = (text: string, type: LogEntry["type"] = "info") => {
-        setLog((prev) => [
+    // Auto-grow textarea
+    useEffect(() => {
+        const el = textareaRef.current;
+        if (!el) return;
+        el.style.height = "auto";
+        el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+    }, [message]);
+
+    const addMessage = (username: string, text: string, isSelf: boolean) => {
+        idCounter.current += 1;
+        setMessages((prev) => [
             ...prev,
-            { time: new Date().toLocaleTimeString(), text, type },
+            {
+                id: idCounter.current,
+                username,
+                text,
+                time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                isSelf,
+            },
         ]);
     };
 
     const connect = async (isRetry = false) => {
         if (socketRef.current) {
-            console.log("found active connection, closing it...");
             socketRef.current.close();
         }
         if (!isRetry) {
-            console.log("refreshing tokens...");
+            setConnecting(true);
             const ok = await refreshTokens();
             if (!ok) {
-                console.log("error when refreshing token");
+                setConnecting(false);
                 await logout();
                 navigate("/login", { replace: true });
                 return;
             }
         }
-        console.log("connecting to websocket...");
-        addLog(`Подключаемся к ${url}…`);
         const ws = new WebSocket(url);
         socketRef.current = ws;
 
         ws.onopen = () => {
             setConnected(true);
-            addLog("✅ Соединение установлено", "info");
+            setConnecting(false);
         };
         ws.onmessage = (event) => {
             try {
                 const parsed = JSON.parse(event.data);
-                addLog(`← ${parsed.message ?? event.data}`, "recv");
+                const text = parsed.message ?? event.data;
+                const username = parsed.username ?? "unknown";
+                const isSelf = username === user?.username;
+                addMessage(username, text, isSelf);
             } catch {
-                addLog(`← [raw] ${event.data}`, "recv");
+                addMessage("system", event.data, false);
             }
         };
         ws.onerror = () => {
-            addLog("❌ Ошибка соединения", "error");
+            setConnecting(false);
         };
         ws.onclose = async (event: CloseEvent) => {
             setConnected(false);
-            addLog(`🔒 Соединение закрыто (code: ${event.code})`, "info");
+            setConnecting(false);
             socketRef.current = null;
             if (event.code === 1008 && !isRetry) {
                 const ok = await refreshTokens();
@@ -88,14 +110,22 @@ export default function WebSocketDemo() {
     };
 
     const send = () => {
-        if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
-            addLog("Нет активного соединения", "error");
-            return;
-        }
+        if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) return;
         if (!message.trim()) return;
-        socketRef.current.send(message);
-        addLog(`→ ${message}`, "sent");
+
+        socketRef.current.send(JSON.stringify({
+            type: "message",
+            payload: message,
+        }));
+        addMessage("you", message, true);
         setMessage("");
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            send();
+        }
     };
 
     return (
@@ -106,69 +136,64 @@ export default function WebSocketDemo() {
                 <div className={styles.header}>
                     <div className={styles.headerLeft}>
                         <span className={`${styles.statusDot} ${connected ? styles.connected : ""}`} />
-                        <span className={styles.headerLabel}>websocket</span>
+                        <span className={styles.headerLabel}>Тикет #{ticket_uuid}</span>
                     </div>
                     <div className={styles.headerRight}>
                         <span className={`${styles.statusText} ${connected ? styles.connected : ""}`}>
-                            {connected ? "connected" : "disconnected"}
+                            {connecting ? "connecting…" : connected ? "online" : "offline"}
                         </span>
                         <button
-                            onClick={() => setLog([])}
-                            className={styles.clearBtn}
+                            onClick={() => connected ? disconnect() : connect()}
+                            disabled={connecting}
+                            className={`${styles.connectBtn} ${connected ? styles.connected : ""}`}
                         >
-                            clear
+                            {connected ? "disconnect" : connecting ? "…" : "connect"}
                         </button>
                     </div>
                 </div>
 
-                {/* URL Bar */}
-                <div className={styles.urlBar}>
-                    <input
-                        value={url}
-                        readOnly
-                        className={styles.urlInput}
-                        placeholder="ws://…"
-                    />
-                    <button
-                        onClick={() => connected ? disconnect() : connect()}
-                        className={`${styles.connectBtn} ${connected ? styles.connected : ""}`}
-                    >
-                        {connected ? "disconnect" : "connect"}
-                    </button>
-                </div>
-
-                {/* Log */}
-                <div className={styles.log}>
-                    {log.length === 0 && (
-                        <div className={styles.logEmpty}>— no events —</div>
+                {/* Messages */}
+                <div className={styles.messages}>
+                    {messages.length === 0 && (
+                        <div className={styles.messagesEmpty}>
+                            {connected ? "Нет сообщений" : "Подключитесь, чтобы начать чат"}
+                        </div>
                     )}
-                    {log.map((entry, i) => (
-                        <div key={i} className={styles.logRow}>
-                            <span className={styles.logTime}>{entry.time}</span>
-                            <span className={`${styles.logText} ${styles[entry.type]}`}>
-                                {entry.text}
-                            </span>
+                    {messages.map((msg) => (
+                        <div
+                            key={msg.id}
+                            className={`${styles.messageRow} ${msg.isSelf ? styles.self : styles.other}`}
+                        >
+                            {!msg.isSelf && (
+                                <span className={styles.username}>{msg.username}</span>
+                            )}
+                            <div className={styles.bubble}>
+                                <span className={styles.bubbleText}>{msg.text}</span>
+                                <span className={styles.bubbleTime}>{msg.time}</span>
+                            </div>
                         </div>
                     ))}
-                    <div ref={logEndRef} />
+                    <div ref={messagesEndRef} />
                 </div>
 
-                {/* Send Bar */}
+                {/* Input */}
                 <div className={styles.sendBar}>
-                    <input
+                    <textarea
+                        ref={textareaRef}
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && send()}
+                        onKeyDown={handleKeyDown}
                         disabled={!connected}
-                        placeholder={connected ? "type a message…" : "connect first"}
+                        placeholder={connected ? "Написать сообщение…" : "Сначала подключитесь"}
                         className={styles.messageInput}
+                        rows={1}
                     />
                     <button
                         onClick={send}
-                        disabled={!connected}
+                        disabled={!connected || !message.trim()}
                         className={`${styles.sendBtn} ${connected ? styles.active : ""}`}
                     >
-                        send ↵
+                        ↵
                     </button>
                 </div>
 

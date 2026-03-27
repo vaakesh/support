@@ -5,6 +5,7 @@ import time
 
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import HTMLResponse
+from redis.asyncio import Redis
 
 import app.models  # noqa: F401 # sqlalchemy models registration
 from app.auth.router import router as auth_router
@@ -13,10 +14,22 @@ from app.logging_config import setup_logging
 from app.users.router import router as users_router
 from app.tickets.router import router as ticket_router
 from app.utils import format_duration
+from app.database import get_redis_pool
+from app.deps import get_redis
+from app.tickets.ws import ConnectionManager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    pool = get_redis_pool()
+    redis = Redis(connection_pool=pool)
+    manager = ConnectionManager(redis)
+    await manager.startup()
+    app.state.connection_manager = manager
+
     yield
+
+    await redis.aclose()
+    await pool.aclose()
 
 
 def create_app(*args, **kwargs) -> FastAPI:
