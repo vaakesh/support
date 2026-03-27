@@ -27,16 +27,25 @@ class MessageRepository(AbstractRepository[TicketMessage]):
     async def get_by_id(self, message_id: int) -> TicketMessage:
         await self.session.get(TicketMessage, message_id)
     
-    async def get_all_messages_by_ticket(self, ticket_id: int) -> list[TicketMessage]:
+    async def get_all_messages_by_ticket(self, ticket_id: int, before: UUID | None = None, limit: int = 20) -> tuple[list[TicketMessage], bool]:
         stmt = (
             select(TicketMessage)
             .where(TicketMessage.ticket_id == ticket_id)
             .options(
                 selectinload(TicketMessage.author),
             )
-            .order_by(TicketMessage.created_at)
+            .order_by(TicketMessage.id.desc())
+            .limit(limit + 1) # берем +1, чтобы понять, есть ли дальше сообщения
         )
-        return (await self.session.execute(stmt)).scalars().all()
+        if before is not None:
+            before_message_id = select(TicketMessage.id).where(TicketMessage.uuid == before)
+            stmt = stmt.where(TicketMessage.id < before_message_id)
+
+        rows = (await self.session.execute(stmt)).scalars().all()
+        has_more = len(rows) > limit
+        messages = rows[:limit]
+
+        return messages, has_more
 
 class TicketRepository(AbstractRepository[Ticket]):
     def __init__(self, session: AsyncSession) -> None:

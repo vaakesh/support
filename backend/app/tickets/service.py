@@ -17,6 +17,35 @@ from sqlalchemy.exc import IntegrityError
 
 from app.users.errors import PermissionDeniedError
 from app.users.models import User
+from app.tickets.ws import ConnectionManager
+from app.users.schemas import UserOut
+
+class ChatService:
+    def __init__(self, message_service: MessageService, connection_manager: ConnectionManager):
+        self.message_service = message_service
+        self.connection_manager = connection_manager
+
+    async def handle_incoming_message(
+            self,
+            ticket_uuid: UUID,
+            user: User,
+            data: dict,
+    ) -> None:
+        message = await self.message_service.send_message(
+            MessageCreate(body=data["message"]),
+            ticket_uuid,
+            user.id,
+        )
+        payload = {
+            **data,
+            "author": UserOut.model_validate(user).model_dump(mode="json"),
+            "message_uuid": str(message.uuid),
+            "body": message.body,
+            "created_at": str(message.created_at),
+            "updated_at": str(message.updated_at),
+        }
+        await self.connection_manager.broadcast(ticket_uuid, payload)
+        
 
 class MessageService:
     def __init__(self, uow: UnitOfWork, redis: Redis) -> None:
@@ -31,11 +60,11 @@ class MessageService:
                 raise PermissionDeniedError()
             return ticket
     
-    async def get_all_messages_by_ticket(self, ticket_uuid: UUID, current_user_id: int) -> list[TicketMessage]:
+    async def get_all_messages_by_ticket(self, ticket_uuid: UUID, current_user_id: int, before: UUID, limit: int | None) -> tuple[list[TicketMessage], bool]:
         async with self.uow as uow:
             ticket = await self._get_ticket_by_uuid(uow, ticket_uuid, current_user_id)
-            messages = await uow.message_repo.get_all_messages_by_ticket(ticket.id)
-            return messages
+            messages, has_more = await uow.message_repo.get_all_messages_by_ticket(ticket.id, before, limit)
+            return messages, has_more
     
     async def send_message(self, payload: MessageCreate, ticket_uuid: UUID, current_user_id: int) -> TicketMessage:
         async with self.uow as uow:
@@ -56,6 +85,15 @@ class TicketService:
         self.uow = uow
         self.redis = redis
     
+    async def check_ticket_access(self, ticket_uuid: UUID, user: User) -> Ticket:
+        async with self.uow as uow:
+            ticket = await self._get_by_uuid(uow, ticket_uuid)
+            
+            if user.id != ticket.customer_id and user.id != ticket.assigned_to_id:
+                raise PermissionDeniedError()
+            
+            return ticket
+
     async def change_status(self, ticket_uuid: UUID, new_status: TicketStatus, current_user: User) -> TicketSchema:
         async with self.uow as uow:
             ticket = await self._get_by_uuid_for_update(uow, ticket_uuid)

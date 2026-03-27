@@ -9,9 +9,10 @@ from redis.asyncio import Redis
 
 from app.service import UnitOfWork
 from app.deps import get_redis, get_uow
-from app.tickets.service import MessageService, TicketService
+from app.tickets.service import ChatService, MessageService, TicketService
 from app.tickets.models import TicketCategory, TicketPriority, TicketStatus
 from app.tickets.schemas import TicketFilter
+from app.tickets.ws import ConnectionManager, get_connection_manager
 
 
 def get_ticket_service(
@@ -25,6 +26,12 @@ def get_message_service(
     redis: Redis = Depends(get_redis),
 ) -> MessageService:
     return MessageService(uow, redis)
+
+def get_chat_service(
+    message_service: MessageService = Depends(get_message_service),
+    connection_manager: ConnectionManager = Depends(get_connection_manager),
+) -> ChatService:
+    return ChatService(message_service, connection_manager)
 
 def get_ticket_filter(
     status: list[TicketStatus] | None = Query(default=None),

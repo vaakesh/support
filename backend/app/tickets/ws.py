@@ -15,7 +15,6 @@ from redis.asyncio.client import PubSub
 
 from fastapi import Depends, Request, WebSocket
 
-from app.deps import get_redis
 
 logger = logging.getLogger(__name__)
 
@@ -59,17 +58,14 @@ class ConnectionManager:
             del self.active_connections[ticket_uuid]
         
 
-    async def broadcast(self, ticket_uuid: str, data: dict, ws: WebSocket) -> None:
-        data["ws"] = str(ws)
+    async def broadcast(self, ticket_uuid: str, data: dict) -> None:
         await self.redis.publish(f"ticket:{ticket_uuid}", json.dumps(data))
 
     async def _broadcast_local(self, ticket_uuid: str, data: dict) -> None:
         current_connections = list(self.active_connections.get(ticket_uuid, []))
         for ws, user_uuid in current_connections:
             try:
-                if data["ws"] == str(ws):
-                    continue
-                new_data = {"type": data["type"], "message": data["payload"], "username": data["username"]}
+                new_data = {"uuid": data["message_uuid"], "body": data["body"], "author": data["author"], "created_at": data["created_at"], "updated_at": data["updated_at"]}
                 logger.info(f"sending {new_data} to {ws}")
                 await ws.send_json(new_data)
             except:
