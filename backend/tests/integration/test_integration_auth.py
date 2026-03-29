@@ -79,7 +79,7 @@ async def test_refresh_token_rotation(auth_cookies_client: AsyncClient) -> None:
     first = await auth_cookies_client.post("/auth/refresh")
     assert first.status_code == status.HTTP_200_OK
 
-    auth_cookies_client.cookies.set("refresh_token", old_refresh, path="/auth/refresh")
+    auth_cookies_client.cookies.set("refresh_token", old_refresh, path="/")
 
     second = await auth_cookies_client.post("/auth/refresh")
     assert second.status_code == status.HTTP_401_UNAUTHORIZED

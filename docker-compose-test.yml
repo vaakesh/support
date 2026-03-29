@@ -3,6 +3,8 @@ services:
     container_name: support-api-test
     env_file:
       - ./backend/.env.test
+    volumes:
+      - ./backend/pytest.ini:/backend/pytest.ini
     
   postgres:
     container_name: support-postgres-test
@@ -18,7 +20,13 @@ services:
       timeout: 5s
       retries: 10
       start_period: 5s
+  
+  redis:
+    container_name: support-redis-test
+    volumes:
+      - redis_data_test:/data
 
 
 volumes:
   pgdata_test:
+  redis_data_test:

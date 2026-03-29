@@ -4,13 +4,13 @@ import pytest
 import pytest_asyncio
 from fastapi import FastAPI, status
 from httpx import ASGITransport, AsyncClient
+from redis.asyncio import Redis
 from sqlalchemy.pool import NullPool
 from app.config import get_settings
 from app.main import create_app
 from app.database import get_async_session_maker
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy import text
-from app.users.models import User
 from tests.helpers import make_user_payload
 
 
@@ -22,6 +22,7 @@ def settings():
     settings = get_settings()
     if settings.db_name != "support_test":
         pytest.exit(f"Tests aborted: wrong database configured: got \"{settings.db_name}\", expected \"support_test\"")
+    return settings
 
 
 @pytest_asyncio.fixture(scope="session")
@@ -71,6 +72,9 @@ async def clear_db(session_maker, settings):
 async def cleanup_db(session_maker, settings):
     yield
     await clear_db(session_maker, settings)
+    redis = Redis.from_url(settings.redis_url())
+    await redis.flushdb()
+    await redis.aclose()
 
 
 @pytest_asyncio.fixture(scope="function")
