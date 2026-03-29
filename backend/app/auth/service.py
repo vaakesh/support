@@ -1,9 +1,9 @@
-from functools import lru_cache
 import hashlib
 import hmac
 import logging
 import secrets
 from datetime import timedelta
+from functools import lru_cache
 from typing import Any
 from uuid import UUID
 
@@ -14,7 +14,13 @@ from app.auth.errors import (
     InvalidTokenTypeError,
 )
 from app.auth.models import UserSession
-from app.auth.schemas import AuthTokenConfig, BearerToken, ClientInfo, IssuedTokens, TokenPair
+from app.auth.schemas import (
+    AuthTokenConfig,
+    BearerToken,
+    ClientInfo,
+    IssuedTokens,
+    TokenPair,
+)
 from app.auth.utils import verify_password
 from app.config import get_settings
 from app.service import UnitOfWork
@@ -85,7 +91,7 @@ class AuthTokenService:
         )
 
 
-@lru_cache()
+@lru_cache
 def get_auth_token_config() -> AuthTokenConfig:
     settings = get_settings()
 
@@ -161,8 +167,7 @@ class AuthService:
     ) -> User:
         user = await uow.user_repo.get_by_username(username)
         if not user or not verify_password(password, user.hashed_password):
-            logger.warning(f"failed login attempt for username={username}")
-            raise UserNotFoundError()
+            raise UserNotFoundError("Invalid username or password")
 
         return user
 

@@ -1,5 +1,5 @@
-from functools import lru_cache
 import logging
+from functools import lru_cache
 from uuid import UUID
 
 from fastapi import Depends, Request, WebSocket, WebSocketDisconnect
@@ -13,7 +13,6 @@ from app.service import UnitOfWork
 from app.users.deps import get_user_service
 from app.users.models import User
 from app.users.service import UserService
-
 
 
 @lru_cache

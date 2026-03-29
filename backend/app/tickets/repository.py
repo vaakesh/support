@@ -51,7 +51,7 @@ class TicketRepository(AbstractRepository[Ticket]):
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
     
-    async def get_by_id(self, ticket_id: int) -> Ticket:
+    async def get_by_id(self, ticket_id: int) -> Ticket | None:
         return await self.session.get(Ticket, ticket_id)
     def add(self, ticket: Ticket) -> None:
         self.session.add(ticket)
@@ -117,9 +117,9 @@ class TicketRepository(AbstractRepository[Ticket]):
             conditions.append(Ticket.created_at <= filter.created_to)
         if filter.search:
             search_value = f"%{filter.search}%"
-            stmt = stmt.where(
+            conditions.append(
                 or_(
-                    Ticket.title.ilike(search_value),
+                    Ticket.subject.ilike(search_value),
                     Ticket.description.ilike(search_value),
                 )
             )
@@ -141,9 +141,9 @@ class TicketRepository(AbstractRepository[Ticket]):
         stmt = stmt.order_by(Ticket.created_at.desc()).limit(200)
 
         result = await self.session.execute(stmt)
-        return result.scalars().all()
+        return list(result.scalars().all())
     
-    async def assign_ticket(self, ticket_uuid: UUID, support_agent_id: int):
+    async def assign_ticket(self, ticket_uuid: UUID, support_agent_id: int) -> bool:
         stmt = (
             update(Ticket)
             .where(

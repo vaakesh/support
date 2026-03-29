@@ -1,6 +1,6 @@
-from typing import TYPE_CHECKING
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.dialects.postgresql import UUID
@@ -9,9 +9,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
 if TYPE_CHECKING:
-    from app.users.models import User
-    from app.tickets.models import Ticket
     from backend.app.auth.models import UserSession
+
+    from app.tickets.models import Ticket
+    from app.users.models import User
 
 class UserSession(Base):
     __tablename__ = "user_sessions"
@@ -66,7 +67,7 @@ class UserSession(Base):
         nullable=True,
     )
 
-    user: Mapped["User"] = relationship(
+    user: Mapped[User] = relationship(
         "User",
         foreign_keys=[user_id],
         back_populates="user_sessions",

@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from app.auth.errors import InvalidTokenError
 from app.users.errors import PermissionDeniedError, UserAlreadyExistsError, UserNotFoundError
 from app.errors import TooManyRequestsError
+from app.tickets.errors import TicketNotFoundError
 
 
 async def user_not_found_handler(
@@ -77,6 +78,14 @@ async def too_many_requests_handler(request: Request, exc: TooManyRequestsError)
         },
     )
 
+async def ticket_not_found_handler(request: Request, exc: TicketNotFoundError):
+    return JSONResponse(
+        status_code=status.HTTP_404_NOT_FOUND,
+        content={
+            "message": str(exc),
+        },
+    )
+
 
 def register_exception_handlers(app: FastAPI):
     app.add_exception_handler(UserNotFoundError, user_not_found_handler)
@@ -86,3 +95,4 @@ def register_exception_handlers(app: FastAPI):
     app.add_exception_handler(PermissionDeniedError, permission_denied_handler)
     app.add_exception_handler(RequestValidationError, request_validation_handler)
     app.add_exception_handler(TooManyRequestsError, too_many_requests_handler)
+    app.add_exception_handler(TicketNotFoundError, ticket_not_found_handler)

@@ -5,6 +5,7 @@
 import json
 from uuid import UUID
 
+from fastapi import HTTPException
 from redis.asyncio import Redis
 
 from app.service import UnitOfWork
@@ -15,7 +16,7 @@ from app.tickets.utils import ALLOWED_TRANSITIONS, calculate_first_response_due_
 from app.utils import utcnow
 from sqlalchemy.exc import IntegrityError
 
-from app.users.errors import PermissionDeniedError
+from app.users.errors import PermissionDeniedError, UserNotFoundError
 from app.users.models import User
 from app.tickets.ws import ConnectionManager
 from app.users.schemas import UserOut
@@ -85,14 +86,12 @@ class TicketService:
         self.uow = uow
         self.redis = redis
     
-    async def check_ticket_access(self, ticket_uuid: UUID, user: User) -> Ticket:
+    async def check_ticket_access(self, ticket_uuid: UUID, user: User) -> None:
         async with self.uow as uow:
             ticket = await self._get_by_uuid(uow, ticket_uuid)
             
             if user.id != ticket.customer_id and user.id != ticket.assigned_to_id:
                 raise PermissionDeniedError()
-            
-            return ticket
 
     async def change_status(self, ticket_uuid: UUID, new_status: TicketStatus, current_user: User) -> TicketSchema:
         async with self.uow as uow:
@@ -114,6 +113,7 @@ class TicketService:
 
             ticket.status = new_status
             await uow.commit()
+            await uow.ticket_repo.refresh(ticket)
             cache_key = f"ticket:{ticket_uuid}"
             await self.redis.delete(cache_key)
             return TicketSchema.model_validate(ticket)
@@ -127,13 +127,13 @@ class TicketService:
             
             ticket = await self._get_by_uuid(uow, ticket_uuid)
 
-            ticket_json = TicketSchema.model_validate(ticket).model_dump_json()
+            ticket_schema = TicketSchema.model_validate(ticket)
             await self.redis.setex(
                 cache_key,
                 300,
-                ticket_json,
+                ticket_schema.model_dump_json(),
             )
-            return TicketSchema.model_validate(ticket)
+            return ticket_schema
         
     async def get_all(self, limit: int = 200) -> list[TicketSchema]:
         async with self.uow as uow:
@@ -155,7 +155,6 @@ class TicketService:
                 )
                 uow.ticket_repo.add(ticket)
                 await uow.commit()
-                await uow.ticket_repo.refresh(ticket)
 
                 created_ticket = await uow.ticket_repo.get_by_uuid(ticket.uuid)
 
@@ -171,15 +170,18 @@ class TicketService:
     async def assign_ticket(self, ticket_uuid: UUID, support_agent_id: int) -> TicketSchema:
         try:
             async with self.uow as uow:
-                is_updated = await uow.ticket_repo.assign_ticket(ticket_uuid, support_agent_id) # пофиксить non-existent ticket_uuid, support_agent_id, ...
+                is_updated = await uow.ticket_repo.assign_ticket(ticket_uuid, support_agent_id)
                 if is_updated:
                     ticket = await self._get_by_uuid(uow, ticket_uuid)
                     await uow.commit()
+                    await uow.ticket_repo.refresh(ticket)
                     cache_key = f"ticket:{ticket_uuid}"
                     await self.redis.delete(cache_key)
                     return TicketSchema.model_validate(ticket)
-        except IntegrityError: # разделить ошибки
-            raise
+                else:
+                    raise TicketNotFoundError()
+        except IntegrityError:
+            raise UserNotFoundError("Support agent not found")
 
     async def mark_viewed(self, ticket_uuid: UUID) -> TicketSchema:
         async with self.uow as uow:
@@ -189,6 +191,7 @@ class TicketService:
                 ticket.status = TicketStatus.OPEN
 
             await uow.commit()
+            await uow.ticket_repo.refresh(ticket)
             cache_key = f"ticket:{ticket_uuid}"
             await self.redis.delete(cache_key)
             return TicketSchema.model_validate(ticket)

@@ -18,9 +18,6 @@ class UserService:
         self.redis = redis
 
     async def get_by_uuid(self, user_uuid: UUID) -> UserSchema:
-        """
-        Returns user by uuid or raises exception
-        """
         cache_key = f"user:{user_uuid}"
         cached = await self.redis.get(cache_key)
         if cached:
@@ -34,9 +31,6 @@ class UserService:
             return user
 
     async def get_by_username(self, username: str) -> User:
-        """
-        Returns user by username or raises exception
-        """
         async with self.uow as uow:
             user = await uow.user_repo.get_by_username(username)
             if user is None:
@@ -44,9 +38,6 @@ class UserService:
             return user
 
     async def get_by_id(self, user_id: int) -> User:
-        """
-        Returns user by id or raises exception
-        """
         async with self.uow as uow:
             user = await uow.user_repo.get_by_id(user_id)
             if user is None:
@@ -54,9 +45,6 @@ class UserService:
             return user
 
     async def get_by_email(self, email: str) -> User:
-        """
-        Returns user by email or raises exception
-        """
         async with self.uow as uow:
             user = await uow.user_repo.get_by_email(email)
             if user is None:
@@ -73,9 +61,6 @@ class UserService:
         self,
         payload: UserCreate,
     ) -> UserSchema:
-        """
-        creates and returns user or raises exception if user exists
-        """
         try:
             async with self.uow as uow:
                 user_data = payload.model_dump(exclude={"password"})
@@ -120,6 +105,7 @@ class UserService:
 
                 if updated:
                     await uow.commit()
+                    await uow.user_repo.refresh(user)
                     cache_key = f"user:{target_user_uuid}"
                     await self.redis.delete(cache_key)
 

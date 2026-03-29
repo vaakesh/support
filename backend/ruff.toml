@@ -8,6 +8,9 @@ extend-select = [
     "I", # isort
     "E501", # line too long
 ]
+ignore = [
+    "F401", # unused import
+]
 
 [format]
 quote-style = "double"
