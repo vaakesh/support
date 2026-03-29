@@ -376,3 +376,36 @@
   text-align: center;
   padding: 60px 0;
 }
+
+/* ── Logout button ── */
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logoutBtn {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid #2e3347;
+  background: #161923;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.logoutBtn:hover {
+  border-color: #4d1a1a;
+  background: #2d0d0d;
+  color: #f87171;
+}
+
+.username {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  align-self: center;
+}

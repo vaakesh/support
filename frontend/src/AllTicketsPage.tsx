@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import styles from "./AllTicketsPage.module.css";
 import fetchWithAuth from "./api/auth";
+import { useAuth } from "./auth/AuthContext";
 
 type TicketStatus = "open" | "pending" | "resolved" | "closed";
 type TicketPriority = "low" | "medium" | "high" | "critical";
@@ -81,6 +82,7 @@ function toggleItem<T>(arr: T[], item: T): T[] {
 }
 
 export default function AllTickets() {
+  const { logout, user } = useAuth();
   const [tickets, setTickets] = useState<TicketOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -88,6 +90,11 @@ export default function AllTickets() {
   const [applied, setApplied] = useState<Filters>(EMPTY_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const navigate = useNavigate();
+
+  const handleLogout = useCallback(async () => {
+    await logout();
+    navigate("/login");
+  }, [logout, navigate]);
 
   const fetchTickets = useCallback((f: Filters) => {
     setLoading(true);
@@ -133,12 +140,18 @@ export default function AllTickets() {
           <h1 className={styles.title}>Тикеты</h1>
           {!loading && <span className={styles.count}>{tickets.length}</span>}
         </div>
-        <button
-          className={`${styles.filterToggle} ${hasActive ? styles.filterToggleActive : ""}`}
-          onClick={() => setFiltersOpen((v) => !v)}
-        >
-          {filtersOpen ? "✕ Закрыть" : `⚙ Фильтры${hasActive ? " •" : ""}`}
-        </button>
+        <div className={styles.headerRight}>
+          {user && <span className={styles.username}>{user.username}</span>}
+          <button
+            className={`${styles.filterToggle} ${hasActive ? styles.filterToggleActive : ""}`}
+            onClick={() => setFiltersOpen((v) => !v)}
+          >
+            {filtersOpen ? "✕ Закрыть" : `⚙ Фильтры${hasActive ? " •" : ""}`}
+          </button>
+          <button className={styles.logoutBtn} onClick={handleLogout}>
+            Выйти                                                
+          </button>
+        </div>
       </header>
 
       {filtersOpen && (

@@ -38,6 +38,7 @@ export default function WebSocketDemo() {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const shouldScrollRef = useRef(false);
+    const [accessDenied, setAccessDenied] = useState(false);
 
     const scrollRestoreRef = useRef<{
         awaitingRestore: boolean;
@@ -128,25 +129,27 @@ export default function WebSocketDemo() {
     // ─── Загрузка страницы истории ───────────────────────────────────────────
 
     const fetchMessages = useCallback(
-        async (before?: string): Promise<boolean> => {
+        async (before?: string): Promise<{ ok: boolean; forbidden?: boolean }> => {
             const params = new URLSearchParams({ limit: "20" });
             if (before) params.set("before", before);
 
             const res = await fetchWithAuth(
                 `/api/tickets/${ticket_uuid}/messages?${params}`
             );
-            if (!res.ok) return false;
+
+            if (res.status === 403) return { ok: false, forbidden: true };
+            if (!res.ok) return { ok: false };
 
             const data: { messages: ApiMessage[]; has_more: boolean } =
                 await res.json();
 
             if (data.messages.length > 0) {
-                const sorted = data.messages.map(toChat).reverse(); // oldest → newest
+                const sorted = data.messages.map(toChat).reverse();
                 setMessages((prev) => [...sorted, ...prev]);
                 oldestUUIDRef.current = sorted[0].uuid;
             }
             setHasMore(data.has_more);
-            return true;
+            return { ok: true };
         },
         [ticket_uuid, toChat]
     );
@@ -176,11 +179,17 @@ export default function WebSocketDemo() {
 
             setLoadingHistory(true);
             isFetchingRef.current = true;
-            const ok = await fetchMessages();
+            const result = await fetchMessages();
             isFetchingRef.current = false;
             setLoadingHistory(false);
+            
+            if (result.forbidden) {
+                setConnecting(false);
+                setAccessDenied(true); // показываем ошибку, не логаутим
+                return;
+            }
 
-            if (!ok) {
+            if (!result.ok) {
                 setConnecting(false);
                 await logout();
                 navigate("/login", { replace: true });
@@ -277,8 +286,23 @@ export default function WebSocketDemo() {
         }
     }, [hasMore, fetchMessages]);
 
-    // ─── Render ───────────────────────────────────────────────────────────────
-
+    if (accessDenied) {
+        return (
+            <div className={styles.root}>
+                <div className={styles.panel}>
+                    <div className={styles.header}>
+                        <div className={styles.headerLeft}>
+                            <span className={styles.headerLabel}>Тикет #{ticket_uuid}</span>
+                        </div>
+                    </div>
+                    <div className={styles.messagesEmpty}>
+                        У вас нет доступа к этому тикету
+                    </div>
+                </div>
+            </div>
+        );
+    }
+    
     return (
         <div className={styles.root}>
             <div className={styles.panel}>
