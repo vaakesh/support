@@ -60,7 +60,7 @@ async def client(app: FastAPI):
 
 
 async def clear_db(session_maker, settings):
-    assert settings.db_name == "support_test", (
+    assert settings.db_name == TEST_DB_NAME, (
         f"refusing to clear non-test DB: {settings.db_name}"
     )
     async with session_maker() as session:

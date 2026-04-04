@@ -25,7 +25,8 @@ async def lifespan(app: FastAPI):
     manager = ConnectionManager(redis)
     await manager.startup()
     app.state.connection_manager = manager
-
+    setup_logging()
+    
     yield
 
     await redis.aclose()
@@ -42,7 +43,6 @@ def create_app(*args, **kwargs) -> FastAPI:
 
     return app
 
-setup_logging()
 app = create_app(lifespan=lifespan)
 
 logger = logging.getLogger(__name__)
