@@ -15,13 +15,13 @@ from tests.helpers import make_user_payload
 
 
 logger = logging.getLogger(__name__)
-
+TEST_DB_NAME = "support_test"
 
 @pytest.fixture(scope="session")
 def settings():
     settings = get_settings()
-    if settings.db_name != "support_test":
-        pytest.exit(f"Tests aborted: wrong database configured: got \"{settings.db_name}\", expected \"support_test\"")
+    if settings.db_name != TEST_DB_NAME:
+        pytest.exit(f"Tests aborted: wrong database configured: got \"{settings.db_name}\", expected \"{TEST_DB_NAME}\"")
     return settings
 
 

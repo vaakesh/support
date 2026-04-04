@@ -30,15 +30,15 @@ services:
     container_name: support-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: support
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: ${db_name}
+      POSTGRES_USER: ${db_user}
+      POSTGRES_PASSWORD: ${db_password}
     ports:
-      - "5432:5432"
+      - "${db_port}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d support"]
+      test: ["CMD-SHELL", "pg_isready -U ${db_user} -d ${db_name}"]
       interval: 5s
       timeout: 5s
       retries: 10

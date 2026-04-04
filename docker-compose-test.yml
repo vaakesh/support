@@ -9,13 +9,15 @@ services:
   postgres:
     container_name: support-postgres-test
     environment:
-      POSTGRES_DB: support_test
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: ${db_name_test}
+      POSTGRES_USER: ${db_user_test}
+      POSTGRES_PASSWORD: ${db_password_test}
     volumes:
       - pgdata_test:/var/lib/postgresql/data
+    ports:
+      - "${db_port_test}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d support_test"]
+      test: ["CMD-SHELL", "pg_isready -U ${db_user_test} -d ${db_name_test}"]
       interval: 5s
       timeout: 5s
       retries: 10
